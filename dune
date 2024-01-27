@@ -1,0 +1,31 @@
+(library
+ (name sqlpp_std)
+ (public_name sqlpp.std)
+ (modules sqlpp_std)
+ (libraries containers ppx_hash.runtime-lib))
+
+(library
+ (name sqlpp_sqlite)
+ (public_name sqlpp.sqlite)
+ (modules sqlpp_sqlite)
+ (kind ppx_rewriter)
+ (flags -open Sqlpp_std)
+ (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx sqlite3))
+
+(library
+ (name sqlpp_manage)
+ (public_name sqlpp.manage)
+ (modules sqlpp_manage)
+ (flags -open Sqlpp_std)
+ (preprocess
+  (pps sqlpp.sqlite))
+ (libraries cmdliner sqlpp sqlpp.std sqlpp.sqlite sqlite3))
+
+(library
+ (name sqlpp_ppx)
+ (public_name sqlpp.ppx)
+ (modules sqlpp_ppx)
+ (flags -open Sqlpp_std)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries ppxlib sqlpp sqlpp.std))

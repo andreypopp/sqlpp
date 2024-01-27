@@ -1,0 +1,11 @@
+(lang dune 3.14)
+(using menhir 3.0)
+(name sqlpp)
+(source (github andreypopp/sqlpp))
+(authors "Andrey Popp")
+(maintainers "Andrey Popp")
+(license MIT)
+(package
+ (name sqlpp)
+ (synopsis "typesafe SQL for OCaml via preprocessing")
+ (depends ocaml dune))

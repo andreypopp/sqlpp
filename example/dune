@@ -1,0 +1,15 @@
+(executable
+ (name main)
+ (modules main)
+ (preprocess
+  (pps db))
+ (libraries db cmdliner sqlpp sqlpp.sqlite))
+
+(library
+ (name db)
+ (modules db)
+ (kind ppx_rewriter)
+ (libraries sqlpp sqlpp.sqlite sqlpp.manage))
+
+(cram
+ (deps ./main.exe))

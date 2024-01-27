@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPTDIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+dune_exec () {
+  if [ -z "$INSIDE_DUNE" ]; then
+    GITROOT=$(git rev-parse --show-toplevel)
+    dune exec -- ./${SCRIPTDIR##$GITROOT}/test_ppx.exe "$@"
+  else 
+    ./test_ppx.exe "$@"
+  fi
+}
+
+function main() {
+  local src="$1"
+  shift
+  echo "let%query q = {|$src|}" \
+    | dune_exec -impl - -test -require $SCRIPTDIR/schema.sql "$@" \
+    | ocamlformat --impl - --enable-outside-detected-project -m 60
+}
+
+if [ $# -eq 0 ]; then 
+  main "$(cat)" "$@"
+else 
+  src="$1";
+  shift;
+  main "$src" "$@"
+fi

@@ -1,0 +1,20 @@
+(library
+ (public_name sqlpp)
+ (name sqlpp)
+ (flags -open Sqlpp_std)
+ (preprocess
+  (pps ppx_hash ppx_compare sedlex.ppx))
+ (libraries
+  re
+  yojson
+  menhirLib
+  sqlpp.std
+  pprint
+  containers
+  sedlex
+  ppx_compare
+  hashcons))
+
+(menhir
+ (explain true)
+ (modules parser))
