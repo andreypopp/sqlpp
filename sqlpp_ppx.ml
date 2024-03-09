@@ -4,6 +4,96 @@ open Analyze
 open Ppxlib
 open Ppxlib.Ast_builder.Default
 
+let enullable gen_v ~loc { nullable; v } =
+  let nullable =
+    match nullable with
+    | `non_null -> [%expr `non_null]
+    | `null -> [%expr `null]
+  in
+  [%expr { Sqlpp.Syntax.nullable = [%e nullable]; v = [%e gen_v ~loc v] }]
+
+let eoption gen ~loc = function
+  | None -> [%expr None]
+  | Some e -> [%expr Some [%e gen ~loc e]]
+
+let ename ~loc:_ (loc, name) = [%expr Sqlpp.Syntax.name [%e estring ~loc name]]
+
+let epair gen1 gen2 ~loc (e1, e2) =
+  [%expr [%e gen1 ~loc e1], [%e gen2 ~loc e2]]
+
+let elist gen ~loc l = elist ~loc (List.map ~f:(fun e -> gen ~loc e) l)
+
+let etysyn ~loc = function
+  | Ty name -> [%expr Sqlpp.Syntax.Ty [%e ename ~loc name]]
+  | Ty_one_of (name, names) ->
+      [%expr
+        Sqlpp.Syntax.Ty_one_of
+          ([%e eoption estring ~loc name], [%e elist ename ~loc names])]
+
+let elit ~loc (lit : lit) =
+  match lit with
+  | Lit_int v -> [%expr Sqlpp.Syntax.Lit_int [%e eint ~loc v]]
+  | Lit_string v -> [%expr Sqlpp.Syntax.Lit_string [%e estring ~loc v]]
+  | Lit_bool v -> [%expr Sqlpp.Syntax.Lit_bool [%e ebool ~loc v]]
+
+exception Not_supported of string
+
+let rec eexpr ~loc (expr : expr) =
+  match expr.node with
+  | Expr_app (name, args) ->
+      [%expr
+        Sqlpp.Syntax.expr_app [%e ename ~loc name] [%e elist eexpr ~loc args]]
+  | Expr_name name -> [%expr Sqlpp.Syntax.expr_name [%e ename ~loc name]]
+  | Expr_lit lit -> [%expr Sqlpp.Syntax.expr_lit [%e elit ~loc lit]]
+  | Expr_nav (name, expr) ->
+      [%expr Sqlpp.Syntax.expr_nav [%e ename ~loc name] [%e eexpr ~loc expr]]
+  | Expr_in (_, _) -> raise (Not_supported "Expr_in")
+  | Expr_ascribe (expr, _ty) -> eexpr ~loc expr
+  | Expr_param _ -> raise (Not_supported "Expr_param")
+  | Expr_match (_, _) -> raise (Not_supported "Expr_match")
+  | Expr_null -> [%expr Sqlpp.Syntax.expr_null ()]
+
+let efield ~loc
+    ({ name; expr; ty; is_generated; is_used; dependencies } : field) =
+  [%expr
+    {
+      Sqlpp.Syntax.name = [%e ename ~loc name];
+      expr = [%e eexpr ~loc expr];
+      ty = [%e enullable etysyn ~loc ty];
+      is_generated = [%e ebool ~loc is_generated];
+      is_used = [%e ebool ~loc is_used];
+      dependencies = [%e elist (epair (eoption ename) ename) ~loc dependencies];
+    }]
+
+let rec escope ~loc (scope : Scope.scope) =
+  let gen_scope_elem ~loc = function
+    | Scope.S scope -> enullable escope ~loc scope
+    | A names -> elist ename ~loc names
+  in
+  let fields =
+    let fields =
+      NT.fold
+        (fun k v next ->
+          match efield ~loc v with
+          | exception Not_supported _ -> next
+          | v ->
+              [%expr
+                Sqlpp.Syntax.NT.add fields [%e ename ~loc k] [%e v];
+                [%e next]])
+        scope.fields [%expr fields]
+    in
+    [%expr
+      let fields = Syntax.NT.create () in
+      [%e fields]]
+  in
+  [%expr
+    {
+      Sqlpp.Analyze.scopes =
+        [%e elist (epair ename gen_scope_elem) ~loc scope.scopes];
+      fields = [%e fields];
+      is_open = [%e ebool ~loc scope.is_open];
+    }]
+
 module Printer_ctx = struct
   type t = { mutable ops : op list }
 
@@ -94,7 +184,16 @@ end = struct
           | None -> failwith (sprintf "no type for %s" (snd name))
           | Some Pty_unknown -> self#emit ctx "NULL"
           | Some (Pty_variant _) -> assert false
-          | Some (Pty_expr _) -> assert false
+          | Some (Pty_expr (ty, scope)) ->
+              let loc = fst name in
+              Printer_ctx.emit p
+                (E
+                   [%expr
+                     let scope = [%e escope ~loc scope] in
+                     let expr = [%e ename ~loc name] () in
+                     let env = Sqlpp.Env.create () in
+                     let expr = Sqlpp.Analyze.analyze_expr ~scope expr env in
+                     Sqlpp_db.To_sql.expr_to_sql expr])
           | Some (Pty ty) ->
               let id = name_to_lident name in
               let encode =
@@ -164,7 +263,7 @@ end = struct
     let loc = expr.pexp_loc in
     [%expr Sqlpp.Syntax.dummy_loc, [%e expr]]
 
-  let gen_ty ~loc ({ nullable; v } as ty : ty) =
+  let gent_ty ~loc ({ nullable; v } as ty : ty) =
     match v with
     | Ty_one_of _ ->
         Report.errorf ~loc
@@ -178,7 +277,7 @@ end = struct
         | `non_null -> ty)
 
   let rec gen_pty ~loc = function
-    | Pty ty -> gen_ty ~loc ty
+    | Pty ty -> gent_ty ~loc ty
     | Pty_variant cases ->
         let cases =
           List.map cases ~f:(fun (tag, ptys) ->
@@ -187,7 +286,7 @@ end = struct
         in
         ptyp_variant ~loc cases Closed None
     | Pty_expr (ty, expr) ->
-        let ty = gen_ty ~loc ty in
+        let ty = gent_ty ~loc ty in
         [%type: unit -> [%t ty] Sqlpp.expr]
     | Pty_unknown ->
         let loc = dummy_loc in
@@ -236,7 +335,7 @@ end = struct
     let fty = [%type: 'acc -> 'acc] in
     List.fold_left (List.rev ret_ty) ~init:fty ~f:(fun ty (p, rty) ->
         let loc = fst p in
-        ptyp_arrow ~loc (Labelled (snd p)) (gen_ty ~loc rty) ty)
+        ptyp_arrow ~loc (Labelled (snd p)) (gent_ty ~loc rty) ty)
 
   let gen_query_to_sql_ty params query k =
     List.fold_left (sort_params params) ~init:k ~f:(fun ty (p, pty) ->
@@ -353,7 +452,7 @@ end = struct
           match typ with
           | None ->
               ptyp_tuple ~loc
-                (List.map query.row ~f:(fun (n, ty) -> gen_ty ~loc:(fst n) ty))
+                (List.map query.row ~f:(fun (n, ty) -> gent_ty ~loc:(fst n) ty))
           | Some t -> ptyp_constr ~loc t []
         in
         let t = [%type: Sqlpp_db.Db.db -> [%t k_typ t]] in

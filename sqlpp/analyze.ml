@@ -2,93 +2,35 @@ open Syntax
 open Ppx_hash_lib.Std.Hash.Builtin
 open Ppx_compare_lib.Builtin
 
-let failwithf fmt = ksprintf failwith fmt
-
-type scope = { scopes : scopes; fields : fields; is_open : bool }
-and scopes = (name * scope_elem) list
-and fields = field NT.t
-and scope_elem = Scope of scope nullable | Alias of name list
-
 type row = (name * ty) list
 
 type pty =
   | Pty of ty
   | Pty_variant of (name * pty list) list
-  | Pty_expr of ty * scope
+  | Pty_expr of ty * Scope.scope
   | Pty_unknown
 
 type params = pty NM.t
 
-module Scopes = struct
-  let rec lookup_step n = function
-    | [] -> `none
-    | (n', v) :: s when equal_name n n' -> (
-        match v with Scope v -> `Scope v | Alias ns -> `Alias (ns, s))
-    | _ :: xs -> lookup_step n xs
-
-  let lookup' =
-    let rec lookup nav n = function
-      | [] -> None
-      | (n', v) :: s when equal_name n n' -> (
-          match v with
-          | Scope v -> Some (nav, v)
-          | Alias ns -> traverse nav s ns)
-      | _ :: xs -> lookup nav n xs
-    and traverse nav s = function
-      | [] -> failwithf "Scopes.lookup': no such scope"
-      | n :: ns -> (
-          match lookup (n :: nav) n s with
-          | None -> None
-          | Some (nav, s) -> (
-              match ns with
-              | [] -> Some (nav, s)
-              | ns -> traverse nav s.v.scopes ns))
-    in
-    lookup []
-
-  let lookup n s = Option.map (fun (_, s) -> s.v) (lookup' n s)
-
-  let rec lookup_many ns s =
-    match ns with
-    | [] -> failwithf "Scopes.lookup_many: no such scope"
-    | n :: ns ->
-        Option.bind (lookup n s) (fun s ->
-            match ns with [] -> Some s | ns -> lookup_many ns s.scopes)
-
-  let rec to_inner = function
-    | (_, Scope _) :: _ as scope -> scope
-    | (_, Alias _) :: s -> to_inner s
-    | [] -> []
-end
-
-let scope_subscope scope name =
-  match List.assoc_opt ~eq:equal_name name (Scopes.to_inner scope.scopes) with
-  | Some (Scope s) -> Some s.v
-  | Some (Alias _) -> failwithf "scope_subscope: alias found"
-  | None -> None
-
-let scope_create ?(is_open = false) ?fields:fields' ?(scopes = []) () =
-  let fields = NT.create 10 in
-  Option.iter (List.iter ~f:(fun f -> NT.replace fields f.name f)) fields';
-  { scopes; fields; is_open }
-
-let scope_fields scope = NT.to_seq_values scope.fields
-
 type query_info = {
-  scope : scope;
-  inner_scope : scope;
+  scope : Scope.scope;
+  inner_scope : Scope.scope;
   params : params;
   row : row;
   query : query pos;
 }
 
 type fieldset_info = {
-  fs_scopes : scopes;
+  fs_scopes : Scope.scopes;
   fs_fields : (ty * name * expr) list;
 }
 
 type env = env_decl NT.t
-and env_decl = T of scope * Ddl.table | Q of query_info | F of fieldset_info
+
+and env_decl =
+  | T of Scope.scope * Ddl.table
+  | Q of query_info
+  | F of fieldset_info
 
 let env_find_table env name =
   let loc = fst name in
@@ -97,30 +39,12 @@ let env_find_table env name =
   | Some _ -> Report.errorf ~loc "not a table: %s" (snd name)
   | None -> Report.errorf ~loc "no such table: %s" (snd name)
 
-let fresh_scope =
-  let rec copy_scope { scopes; fields; is_open } =
-    { scopes = copy_scopes scopes; fields = copy_fields fields; is_open }
-  and copy_scopes s = List.map ~f:(fun (n, v) -> n, copy_scopeb v) s
-  and copy_scopeb = function
-    | Scope s -> Scope { s with v = copy_scope s.v }
-    | Alias n -> Alias n
-  and copy_fields c =
-    let c' = NT.create (NT.length c) in
-    NT.iter
-      (fun k v ->
-        let v = fresh_field v in
-        NT.replace c' k v)
-      c;
-    c'
-  in
-  copy_scope
-
 let lookup_field scope e =
-  NT.to_seq scope.fields
+  NT.to_seq scope.Scope.fields
   |> Seq.find_map (fun (n, f) -> if equal_expr e f.expr then Some f else None)
 
 let subscopes scope =
-  List.to_seq scope.scopes
+  List.to_seq scope.Scope.scopes
   |> Seq.uniq (Equal.map ~f:fst equal_name)
   |> Seq.map (fun ((_, n), _) -> n)
   |> List.of_seq
@@ -128,7 +52,7 @@ let subscopes scope =
 
 let build_field scope ~dependencies ~is_generated ~is_used name expr ty =
   let f = make_field ~dependencies ~is_generated ~is_used name expr ty in
-  NT.replace scope.fields name f;
+  NT.replace scope.Scope.fields name f;
   f
 
 let subsumes ~loc (ty : ty) ~(sup : ty) =
@@ -166,15 +90,15 @@ let rec sty_to_scope ?src env (sty : sty) =
                 scopes, f :: fields
             | Sty_elem_scope sty ->
                 let scope = sty_to_scope ?src env sty in
-                (name, Scope (non_null scope)) :: scopes, fields)
+                (name, Scope.S (non_null scope)) :: scopes, fields)
       in
-      scope_create ~is_open:true ~fields ~scopes ()
+      Scope.scope_create ~is_open:true ~fields ~scopes ()
 
-let rec scope_subsumes ~loc scope ~(sup : scope) =
-  scopes_subsumes ~loc scope.scopes ~sup:sup.scopes;
+let rec scope_subsumes ~loc scope ~(sup : Scope.scope) =
+  scopes_subsumes ~loc scope.Scope.scopes ~sup:sup.scopes;
   NT.iter
     (fun name f ->
-      match NT.find_opt scope.fields name with
+      match NT.find_opt scope.Scope.fields name with
       | Some f' -> ignore (subsumes ~loc f.ty ~sup:f'.ty : ty)
       | None -> Report.errorf ~loc "no such column: %s" (snd name))
     sup.fields
@@ -182,14 +106,14 @@ let rec scope_subsumes ~loc scope ~(sup : scope) =
 and scopes_subsumes ~loc scopes ~sup =
   List.iter sup ~f:(fun (name, _) ->
       let scope =
-        match Scopes.lookup' name scopes with
+        match Scope.Scopes.lookup' name scopes with
         | Some (_names, v) -> v.v
         | None -> failwithf "scopes_subsumes: no such scope"
       in
       let sup =
         match List.assoc_opt ~eq:equal_name name sup with
-        | Some (Scope v') -> v'.v
-        | Some (Alias _) | None -> failwithf "scopes_subsumes: alias found"
+        | Some (S v') -> v'.v
+        | Some (A _) | None -> failwithf "scopes_subsumes: alias found"
       in
       scope_subsumes ~loc scope ~sup)
 
@@ -253,7 +177,7 @@ module Params = struct
           match ty with None -> params | Some ty -> NM.add name ty params)
 end
 
-let try_resolve_name ~f (env : scope) name =
+let try_resolve_name ~f (env : Scope.scope) name =
   let loc, name' = name in
   let xs =
     List.to_seq env.scopes
@@ -276,17 +200,17 @@ let make_query_ctx ?params env =
 
 module Expr_ctx : sig
   type t = private {
-    scope : scope;
+    scope : Scope.scope;
     is_used : bool;
     query_ctx : query_ctx;
     mutable dependencies : (name option * name) list;
   }
 
-  val make : is_used:bool -> scope -> query_ctx -> t
+  val make : is_used:bool -> Scope.scope -> query_ctx -> t
   val add_dependency : t -> name option * name -> unit
 end = struct
   type t = {
-    scope : scope;
+    scope : Scope.scope;
     is_used : bool;
     query_ctx : query_ctx;
     mutable dependencies : (name option * name) list;
@@ -307,7 +231,7 @@ let get_select_row scope select =
     | Field f when not f.is_used -> None
     | Field f -> (
         let name = Option.get_exn_or "impossible" f.name in
-        match NT.find_opt scope.fields name with
+        match NT.find_opt scope.Scope.fields name with
         | Some f -> Some (name, f.ty)
         | None -> failwithf "get_select_row: no such field"))
 
@@ -318,11 +242,11 @@ let resolve_field_dependency scope (scope_name, name) =
     | Some scope_name ->
         let rec lookup = function
           | [] -> failwithf "missing scope: %s" (snd scope_name)
-          | (n, Alias v) :: scopes -> lookup scopes
-          | (n, Scope v) :: scopes when equal_name n scope_name -> v.v
-          | (n, Scope _) :: scopes -> lookup scopes
+          | (n, Scope.A v) :: scopes -> lookup scopes
+          | (n, S v) :: scopes when equal_name n scope_name -> v.v
+          | (n, S _) :: scopes -> lookup scopes
         in
-        lookup scope.scopes
+        lookup scope.Scope.scopes
   in
   match NT.find_opt scope'.fields name with
   | Some f -> scope', f
@@ -346,7 +270,7 @@ let mark_field_as_used ctx scope n f =
   if ctx.is_used then mark_field_as_used scope f
 
 module Check_agg = struct
-  type ctx = { group_by : expr list option; scope : scope }
+  type ctx = { group_by : expr list option; scope : Scope.scope }
 
   let is_agg_expr_app name _args =
     match snd name with "count" | "sum" | "max" | "min" -> true | _ -> false
@@ -365,7 +289,7 @@ module Check_agg = struct
 
       method! fold_From_select ctx select alias () =
         let scope =
-          match scope_subscope ctx.scope alias with
+          match Scope.scope_subscope ctx.scope alias with
           | Some scope -> scope
           | None -> failwithf "Check_agg.fold_From_select: no such scope"
         in
@@ -417,7 +341,7 @@ let rec infer_expr ~(ctx : Expr_ctx.t) (expr : expr) : ty * expr =
   let loc = expr.loc in
   match expr.node with
   | Expr_nav (name, expr) -> (
-      match Scopes.lookup_step name ctx.scope.scopes with
+      match Scope.Scopes.lookup_step name ctx.scope.scopes with
       | `Alias (names, scopes) ->
           let names = List.rev names in
           let expr =
@@ -480,7 +404,7 @@ let rec infer_expr ~(ctx : Expr_ctx.t) (expr : expr) : ty * expr =
       | None -> (
           let res =
             try_resolve_name ctx.scope name ~f:(fun n ->
-                match Scopes.lookup' n ctx.scope.scopes with
+                match Scope.Scopes.lookup' n ctx.scope.scopes with
                 | Some ([], s) -> (
                     match NT.find_opt s.v.fields name with
                     | Some f -> Some (`field (n, s, f))
@@ -689,7 +613,7 @@ and infer_expr_app ~ctx name args =
           null date, expr_app ~loc name [ x ])
   | name, _ -> Report.errorf ~loc "no such function %s" name
 
-and infer_select ~ctx (select : select) : scope * select =
+and infer_select ~ctx (select : select) : Scope.scope * select =
   let {
     select_proj;
     select_from;
@@ -704,10 +628,10 @@ and infer_select ~ctx (select : select) : scope * select =
   let loc = select.loc in
   let scope, select_from =
     match select_from with
-    | None -> scope_create ~is_open:select_is_open (), None
+    | None -> Scope.scope_create ~is_open:select_is_open (), None
     | Some select_from ->
         let scopes, from = infer_from ~ctx select_from in
-        let scope = scope_create ~is_open:select_is_open ~scopes () in
+        let scope = Scope.scope_create ~is_open:select_is_open ~scopes () in
         scope, Some from
   in
   let select_where =
@@ -754,17 +678,17 @@ and infer_select ~ctx (select : select) : scope * select =
                   ~f:(fun scopes (n, s) arg ->
                     let loc = fst (List.hd arg) in
                     let scope =
-                      match Scopes.lookup_many arg scope.scopes with
+                      match Scope.Scopes.lookup_many arg scope.scopes with
                       | Some s -> s
                       | None ->
                           Report.errorf ~loc "no such table/query `%s`"
                             (List.map arg ~f:snd |> String.concat ~sep:".")
                     in
                     let scope' =
-                      match s with Scope s -> s.v | Alias _ -> assert false
+                      match s with Scope.S s -> s.v | A _ -> assert false
                     in
                     scope_subsumes ~loc scope ~sup:scope';
-                    (n, Alias arg) :: scopes)
+                    (n, Scope.A arg) :: scopes)
               with
               | exception Invalid_argument _ ->
                   Report.errorf ~loc
@@ -783,8 +707,8 @@ and infer_select ~ctx (select : select) : scope * select =
                     : field);
                 Field { expr; name = Some name; is_used })
         | Field_with_scope (path, name) ->
-            let next_scopes = (name, Alias path) :: scope.scopes in
-            if Option.is_none (Scopes.lookup' name next_scopes) then
+            let next_scopes = (name, Scope.A path) :: scope.scopes in
+            if Option.is_none (Scope.Scopes.lookup' name next_scopes) then
               Report.errorf ~loc "no such table/query `%s`"
                 (List.map path ~f:snd |> String.concat ~sep:".");
             scopes := next_scopes;
@@ -823,21 +747,21 @@ and infer_from ~ctx ((loc, from) : from pos) =
   match from with
   | From from ->
       let scope, name, from = infer_from_one ~ctx from in
-      [ name, Scope scope ], (loc, From from)
+      [ name, S scope ], (loc, From from)
   | From_join (from, right, kind, expr) ->
       let bindings, left = infer_from ~ctx from in
       let rscope, rname, right = infer_from_one ~ctx right in
       let _, expr =
-        let scopes = (rname, Scope rscope) :: bindings in
-        let scope = scope_create ~scopes () in
+        let scopes = (rname, Scope.S rscope) :: bindings in
+        let scope = Scope.scope_create ~scopes () in
         check_expr (null bool)
           ~ctx:(Expr_ctx.make ~is_used:true scope ctx)
           expr
       in
       let bindings =
         match kind with
-        | Join_inner -> (rname, Scope rscope) :: bindings
-        | Join_left -> (rname, Scope (null rscope.v)) :: bindings
+        | Join_inner -> (rname, Scope.S rscope) :: bindings
+        | Join_left -> (rname, S (null rscope.v)) :: bindings
       in
       bindings, (loc, From_join (left, right, kind, expr))
 
@@ -848,7 +772,7 @@ and infer_from_one ~ctx (loc, from) =
       match NT.find_opt ctx.env name with
       | Some (T (scope, _)) -> non_null scope, alias, (loc, from)
       | Some (Q { scope; query = loc, Query_select select; _ }) ->
-          let scope = fresh_scope scope in
+          let scope = Scope.fresh scope in
           non_null scope, alias, (loc, From_select (select, alias))
       | Some (Q q) ->
           Report.errorf ~loc:(fst q.query) "cannot select from %s" (snd name)
@@ -887,14 +811,14 @@ and infer_insert ~ctx (insert : insert) =
                 List.map2 insert_columns row ~f:(fun col expr ->
                     let f = find_field col in
                     let ctx =
-                      Expr_ctx.make ~is_used:true (scope_create ()) ctx
+                      Expr_ctx.make ~is_used:true (Scope.scope_create ()) ctx
                     in
                     let ty, expr = check_expr ~ctx f.ty expr in
                     ignore (subsumes ~loc:expr.loc ty ~sup:f.ty : ty);
                     expr)
               with Invalid_argument _ -> arity_error ~loc (List.length row))
         in
-        Insert_from_values rows, scope_create ()
+        Insert_from_values rows, Scope.scope_create ()
     | Insert_from_select select ->
         let scope, select = infer_select ~ctx select in
         Check_agg.run scope Check_agg.fold#fold_select select;
@@ -923,7 +847,7 @@ and infer_insert ~ctx (insert : insert) =
     Report.errorf ~loc "missing required columns: %s"
       (String.concat ~sep:", " missing_columns);
   {
-    scope = scope_create ();
+    scope = Scope.scope_create ();
     inner_scope;
     params = ctx.params.params;
     row = [];
@@ -943,8 +867,8 @@ and infer_delete ~ctx (delete : delete) =
     | None -> None
     | Some e ->
         let scope =
-          scope_create
-            ~scopes:[ delete_table, Scope (non_null table_scope) ]
+          Scope.scope_create
+            ~scopes:[ delete_table, Scope.S (non_null table_scope) ]
             ()
         in
         let ctx = Expr_ctx.make ~is_used:true scope ctx in
@@ -952,8 +876,8 @@ and infer_delete ~ctx (delete : delete) =
         Some e
   in
   {
-    scope = scope_create ();
-    inner_scope = scope_create ();
+    scope = Scope.scope_create ();
+    inner_scope = Scope.scope_create ();
     params = ctx.params.params;
     row = [];
     query =
@@ -971,8 +895,8 @@ and infer_update ~ctx (update : update) =
         let scopes, from = infer_from ~ctx from in
         scopes, Some from
   in
-  let scopes = (update_table, Scope (non_null table_scope)) :: scopes in
-  let scope = scope_create ~scopes () in
+  let scopes = (update_table, Scope.S (non_null table_scope)) :: scopes in
+  let scope = Scope.scope_create ~scopes () in
   let update_where =
     update_where
     |> Option.map
@@ -993,10 +917,10 @@ and infer_update ~ctx (update : update) =
         name, expr)
   in
   Option.iter
-    (Check_agg.run (scope_create ~scopes ()) Check_agg.fold#fold_from)
+    (Check_agg.run (Scope.scope_create ~scopes ()) Check_agg.fold#fold_from)
     update_from;
   {
-    scope = scope_create ();
+    scope = Scope.scope_create ();
     inner_scope = scope;
     params = ctx.params.params;
     row = [];
@@ -1035,9 +959,9 @@ let analyze_fieldset ?src (db : env) (_loc, fieldset) =
     List.fold_left fieldset.fieldset_args ~init:[]
       ~f:(fun bindings (name, sty) ->
         let scope = sty_to_scope ?src db sty in
-        (name, Scope (non_null scope)) :: bindings)
+        (name, Scope.S (non_null scope)) :: bindings)
   in
-  let scope = scope_create ~scopes:fs_scopes () in
+  let scope = Scope.scope_create ~scopes:fs_scopes () in
   let ctx = make_query_ctx db in
   let ctx = Expr_ctx.make ~is_used:true scope ctx in
   let fs_fields =
@@ -1050,7 +974,7 @@ let analyze_fieldset ?src (db : env) (_loc, fieldset) =
 let analyze_expr ?ty ?scope ?src (db : env) expr =
   Report.with_src ?src @@ fun () ->
   let ctx = make_query_ctx db in
-  let scope = Option.get_lazy scope_create scope in
+  let scope = Option.get_lazy Scope.scope_create scope in
   let ctx = Expr_ctx.make ~is_used:true scope ctx in
   let _ty, expr =
     match ty with

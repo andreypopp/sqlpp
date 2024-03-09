@@ -182,9 +182,10 @@ module Command_line_interface = struct
     let f =
       List.fold_left ~init:Syntax.NM.empty ~f:(fun params p ->
           match String.split_on_char ~by:'=' p with
-          | [ name; value ] ->
-              Syntax.NM.add (Syntax.dummy_loc, name) value params
-          | _ -> failwith "invalid parameter")
+          | n :: vs ->
+              let v = String.concat ~sep:"=" vs in
+              Syntax.(NM.add (dummy_loc, n)) v params
+          | _ -> failwith "invalid parameter, should be NAME=VALUE")
     in
     Term.(const f $ arg)
 

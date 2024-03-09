@@ -1,6 +1,8 @@
 include ContainersLabels
 include Printf
 
+let failwithf fmt = ksprintf failwith fmt
+
 type 'a ord = 'a Ord.t
 type 'a eq = 'a Equal.t
 type 'a hash = 'a Hash.t

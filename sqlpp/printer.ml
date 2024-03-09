@@ -42,7 +42,7 @@ let quote_ident =
     Buffer.clear buf;
     s
 
-type 'ctx ctx = { ctx : 'ctx; scope : Analyze.scope }
+type 'ctx ctx = { ctx : 'ctx; scope : Scope.scope }
 
 class virtual ['ctx] printer =
   object (self)
@@ -144,7 +144,7 @@ class virtual ['ctx] printer =
         Seq.append
           (List.to_seq select.select_proj
           |> Seq.filter (function Field f -> f.is_used | _ -> assert false))
-          (Analyze.scope_fields ctx.scope
+          (Scope.scope_fields ctx.scope
           |> Seq.filter_map (fun f ->
                  if f.is_generated && f.is_used then
                    Some
@@ -196,7 +196,7 @@ class virtual ['ctx] printer =
           self#emit_name ctx alias
       | From_select (select, alias) ->
           let scope =
-            Analyze.scope_subscope ctx.scope alias
+            Scope.scope_subscope ctx.scope alias
             |> Option.get_exn_or "missing scope"
           in
           let ctx = { ctx with scope } in

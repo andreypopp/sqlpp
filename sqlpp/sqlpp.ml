@@ -1,5 +1,6 @@
 module Report = Report
 module Syntax = Syntax
+module Scope = Scope
 module Analyze = Analyze
 module Printer = Printer
 module Ddl = Ddl
@@ -31,18 +32,18 @@ let parse_expr = parse_with Parser.expr_one
 let format_with_scope =
   let open Syntax in
   object
-    inherit [Analyze.scope] format as super
+    inherit [Scope.scope] format as super
 
     method! format_From_select scope select name =
       let scope =
-        Analyze.scope_subscope scope name |> Option.get_exn_or "missing scope"
+        Scope.scope_subscope scope name |> Option.get_exn_or "missing scope"
       in
       super#format_From_select scope select name
 
     method! format_fields scope fields =
       let fields =
         Seq.append fields
-          (Analyze.scope_fields scope
+          (Scope.scope_fields scope
           |> Seq.filter_map (fun f ->
                  if f.is_generated then
                    Some
@@ -99,7 +100,7 @@ module Env = struct
               in
               Ddl.table (snd name) columns
         in
-        NT.replace env name (T (Analyze.scope_create ~fields (), ddl))
+        NT.replace env name (T (Scope.scope_create ~fields (), ddl))
     | Syntax.Decl_query (name, query) ->
         let q = Analyze.analyze_query ?src env query in
         if NT.mem env name then raise_duplicate name;
@@ -367,7 +368,7 @@ module Make (Db : DB) : BACKEND with module Db = Db = struct
       printer#emit_expr
         {
           ctx = { buf; params; params_types = Syntax.NM.empty; env };
-          scope = Analyze.scope_create ();
+          scope = Scope.scope_create ();
         }
         expr;
       Buffer.contents buf

@@ -1,17 +1,5 @@
 open Syntax
-
-type scope = { scopes : scopes; fields : fields; is_open : bool }
-(** query scope, a nested structure keeping track of all fields which are
-    defined/generated *)
-
-and scopes
-and fields = field NT.t
-
-val scope_create :
-  ?is_open:bool -> ?fields:field list -> ?scopes:scopes -> unit -> scope
-
-val scope_subscope : scope -> name -> scope option
-val scope_fields : scope -> field Seq.t
+open Scope
 
 type params = pty NM.t
 (** query params *)
