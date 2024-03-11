@@ -92,3 +92,23 @@ one more example which showcases nested aliases:
         ( name:string option -> 'acc -> 'acc,
           'acc )
         Sqlpp_db.query)
+
+shadowing is also supported:
+  $ p '
+  > select
+  >   x.id as xid,
+  >   withscope y as x,
+  >   x.id as yid,
+  > from users as x
+  > join users as y on true
+  > ' -print
+  SELECT
+    x.id AS xid,
+    y.id AS yid
+  FROM users AS x JOIN users AS y ON TRUE
+  let q =
+    (assert false
+      : unit ->
+        ( xid:int -> yid:int -> 'acc -> 'acc,
+          'acc )
+        Sqlpp_db.query)
