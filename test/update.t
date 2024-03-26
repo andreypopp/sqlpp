@@ -48,6 +48,14 @@ test that params require no annotation:
   $ s 'update users set id = id + 1 returning id'
   UPDATE "users" SET "id" = ("users"."id" + 1) RETURNING "users"."id" AS "id"
 
+TODO: decide if/how we want to allow/disallow that (referencing tables from
+`FROM` in `RETURNING`), e.g. SQLight does not support it but other databases
+IIRC do:
+  $ s 'update users set id = u.id
+  >    from users as u where u.id = users.id
+  >    returning u.id as u_id, users.id as users_id'
+  UPDATE "users" SET "id" = "u"."id" FROM "users" AS "u" WHERE ("u"."id" = "users"."id") RETURNING "u"."id" AS "u_id", "users"."id" AS "users_id"
+
 TODO: error message is off
   $ p 'update users set id = u.id from (select ... from users group by name) as u where u.id = users.id'
   ERROR: File "_none_", line 1

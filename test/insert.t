@@ -42,6 +42,17 @@ test alternative syntax with `SET`:
   $ s "insert into profiles set user_id=1, settings='s', info='i' returning user_id"
   INSERT INTO "profiles" ("user_id", "settings", "info") VALUES (1, 's', 'i') RETURNING "profiles"."user_id" AS "user_id"
 
+though cannot reference anything else but the columns of the table being inserted into:
+  $ s "insert into profiles(user_id, settings, info)
+  >    select id, 's', 'i' from users
+  >    returning users.id"
+  ERROR: File "_none_", line 3, characters 13-21
+  │    select id, 's', 'i' from users
+  │    returning users.id
+  │              ⮬ no such table/query `users` (available profiles)
+  
+  [1]
+
 TODO: error message is off
   $ p "insert into profiles(user_id, settings, info)
   >    select id, 's', from users"
