@@ -8,9 +8,7 @@ it is possible to define a fieldset and then splice it into a query:
     WITH users.id AS user_id,
     WITH users.name AS user_name
   FROM users
-  let q =
-    (assert false
-      : unit -> ('acc -> 'acc, 'acc) Sqlpp_db.query)
+  let q = (assert false : unit -> Sqlpp_db.stmt)
 
 without `with` the fieldset will actually select the fields:
   $ p '

@@ -1,5 +1,6 @@
 
   $ alias p='./test.exe sqlpp-analyze --require ./schema.sql'
+  $ alias s='./test.exe sqlpp-sql --require ./schema.sql'
 
   $ p 'update users set id = 42'
   UPDATE users SET id = 42
@@ -41,6 +42,11 @@ test that params require no annotation:
   │                                 ⮬ no such table x
   
   [1]
+
+`RETURNING` clause is supported:
+
+  $ s 'update users set id = id + 1 returning id'
+  UPDATE "users" SET "id" = ("users"."id" + 1) RETURNING "users"."id" AS "id"
 
 TODO: error message is off
   $ p 'update users set id = u.id from (select ... from users group by name) as u where u.id = users.id'

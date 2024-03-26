@@ -1,5 +1,6 @@
 
   $ alias p='./test.exe sqlpp-analyze --require ./schema.sql'
+  $ alias s='./test.exe sqlpp-sql --require ./schema.sql'
 
   $ p 'delete from users'
   DELETE FROM users
@@ -20,3 +21,8 @@
   │             ⮬ no such table: x
   
   [1]
+
+`RETURNING` clause is supported.
+
+  $ s 'delete from users returning id'
+  DELETE FROM "users" RETURNING "users"."id" AS "id"

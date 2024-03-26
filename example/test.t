@@ -43,8 +43,11 @@
   COMMIT;
 
   $ ./main.exe todos-insert "buy milk"
+  TODO 1 inserted
   $ ./main.exe todos-insert "buy bread"
+  TODO 2 inserted
   $ ./main.exe todos-insert "write ocaml" --project job
+  TODO 3 inserted
 
   $ ./main.exe todos-ls | sanitize
   1: [ ] buy milk (DATETIME) #default

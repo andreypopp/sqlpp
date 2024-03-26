@@ -93,6 +93,7 @@ and updatesyn = {
   update_table : name;
   update_where : expr option;
   update_from : from pos option;
+  update_returning : select_field list;
 }
 
 and update = updatesyn node
@@ -103,6 +104,7 @@ and insertsyn = {
   insert_columns : name list;
   insert_from : insert_from;
   insert_on_conflict : on_conflict option;
+  insert_returning : select_field list;
 }
 
 and on_conflict = On_conflict_replace | On_conflict_ignore
@@ -110,7 +112,11 @@ and on_conflict = On_conflict_replace | On_conflict_ignore
 and insert = insertsyn node
 (** INSERT INTO ... *)
 
-and deletesyn = { delete_table : name; delete_where : expr option }
+and deletesyn = {
+  delete_table : name;
+  delete_where : expr option;
+  delete_returning : select_field list;
+}
 
 and delete = deletesyn node
 (** DELETE FROM ... WHERE ... *)
@@ -193,6 +199,7 @@ val update :
   ?loc:loc ->
   ?from:from pos ->
   ?where:expr ->
+  ?returning:select_field list ->
   name ->
   (name * expr) list ->
   update
@@ -200,12 +207,14 @@ val update :
 val insert :
   ?loc:loc ->
   ?on_conflict:on_conflict ->
+  ?returning:select_field list ->
   name ->
   name list ->
   insert_from ->
   insert
 
-val delete : ?loc:loc -> ?where:expr -> name -> delete
+val delete :
+  ?loc:loc -> ?where:expr -> ?returning:select_field list -> name -> delete
 
 (** OUT OF BAND FIELDS *)
 

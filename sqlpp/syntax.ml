@@ -164,6 +164,7 @@ and updatesyn = {
   update_table : name;
   update_where : expr option;
   update_from : from pos option;
+  update_returning : select_field list;
 }
 (** UPDATE ... SET ... *)
 
@@ -174,13 +175,18 @@ and insertsyn = {
   insert_columns : name list;
   insert_from : insert_from;
   insert_on_conflict : on_conflict option;
+  insert_returning : select_field list;
 }
 (** INSERT INTO ... *)
 
 and on_conflict = On_conflict_replace | On_conflict_ignore
 and insert = insertsyn node
 
-and deletesyn = { delete_table : name; delete_where : expr option }
+and deletesyn = {
+  delete_table : name;
+  delete_where : expr option;
+  delete_returning : select_field list;
+}
 (** DELETE FROM ... WHERE ... *)
 
 and delete = deletesyn node
@@ -283,13 +289,14 @@ module Eq_update = Eq_class.Make (struct
   let equal = equal_updatesyn
 end)
 
-let update ?(loc = dummy_loc) ?from ?where table set =
+let update ?(loc = dummy_loc) ?from ?where ?(returning = []) table set =
   let node =
     {
       update_table = table;
       update_set = set;
       update_where = where;
       update_from = from;
+      update_returning = returning;
     }
   in
   { node; loc; eq = Eq_update.v node }
@@ -301,13 +308,15 @@ module Eq_insert = Eq_class.Make (struct
   let equal = equal_insertsyn
 end)
 
-let insert ?(loc = dummy_loc) ?on_conflict table columns from =
+let insert ?(loc = dummy_loc) ?on_conflict ?(returning = []) table columns from
+    =
   let node =
     {
       insert_table = table;
       insert_columns = columns;
       insert_from = from;
       insert_on_conflict = on_conflict;
+      insert_returning = returning;
     }
   in
   { node; loc; eq = Eq_insert.v node }
@@ -319,8 +328,14 @@ module Eq_delete = Eq_class.Make (struct
   let equal = equal_deletesyn
 end)
 
-let delete ?(loc = dummy_loc) ?where table =
-  let node = { delete_table = table; delete_where = where } in
+let delete ?(loc = dummy_loc) ?where ?(returning = []) table =
+  let node =
+    {
+      delete_table = table;
+      delete_where = where;
+      delete_returning = returning;
+    }
+  in
   { node; loc; eq = Eq_delete.v node }
 
 (* expr aux *)
@@ -503,7 +518,9 @@ class ['ctx] format =
         ^^ self#format_order_by ctx select_order_by)
 
     method format_insert ctx insert =
-      let { insert_table; insert_columns; insert_from } = insert.node in
+      let { insert_table; insert_columns; insert_from; insert_returning } =
+        insert.node
+      in
       let from =
         match insert_from with
         | Insert_from_values values ->
@@ -539,7 +556,18 @@ class ['ctx] format =
                    ^^ rparen)))
         ^^ break 1
         ^^ from
-        ^^ on_conflict)
+        ^^ on_conflict
+        ^^ self#format_returning ctx insert_returning)
+
+    method private format_returning ctx fields =
+      match fields with
+      | [] -> empty
+      | fields ->
+          group
+            (break 1
+            ^^ self#format_kw "RETURNING"
+            ^^ nest 2 (break 1 ^^ self#format_fields ctx (List.to_seq fields))
+            )
 
     method format_values ctx es =
       group
@@ -552,7 +580,13 @@ class ['ctx] format =
              ^^ rparen))
 
     method format_update ctx update =
-      let { update_table; update_set; update_from; update_where } =
+      let {
+        update_table;
+        update_set;
+        update_from;
+        update_where;
+        update_returning;
+      } =
         update.node
       in
       group
@@ -572,19 +606,21 @@ class ['ctx] format =
            | None -> empty
            | Some from ->
                break 1 ^^ self#format_kw "FROM" ^^> self#format_from ctx from)
-        ^^ self#format_where ctx update_where)
+        ^^ self#format_where ctx update_where
+        ^^ self#format_returning ctx update_returning)
 
     method format_update_set ctx (n, e) =
       group (self#format_name n ^^ string " = " ^^ self#format_expr None ctx e)
 
     method format_delete ctx delete =
-      let { delete_table; delete_where } = delete.node in
+      let { delete_table; delete_where; delete_returning } = delete.node in
       group
         (group
            (self#format_kw "DELETE FROM"
            ^^ break 1
            ^^ self#format_name delete_table)
-        ^^ self#format_where ctx delete_where)
+        ^^ self#format_where ctx delete_where
+        ^^ self#format_returning ctx delete_returning)
 
     method format_field ctx =
       function

@@ -54,6 +54,7 @@ let to_loc (loc_start, loc_end) =
 %token TABLE
 %token FIELDSET
 %token EXPR
+%token RETURNING
 %token <string> FIELDSET_SPLICE
 %token <string> PARAM
 
@@ -174,11 +175,16 @@ select_tail:
 select_from:
   FROM; from = from { from }
 
+returning:
+  RETURNING; fields = simple_fields; { fields }
+
 insert:
-  INSERT; INTO; table = name; t = insert_tail; on_conflict = option(insert_on_conflict);
+  INSERT; INTO; table = name; t = insert_tail;
+  on_conflict = option(insert_on_conflict);
+  returning = option(returning);
   {
     let columns, from = t in
-    insert ~loc:(to_loc $loc) ?on_conflict table columns from
+    insert ~loc:(to_loc $loc) ?on_conflict ?returning table columns from
   }
 
 insert_on_conflict:
@@ -206,14 +212,17 @@ update:
   SET; set = nonempty_flex_list(COMMA, set);
   from = option(update_from);
   where = option(where);
-  { update ~loc:(to_loc $loc) ?from ?where table set }
+  returning = option(returning);
+  { update ~loc:(to_loc $loc) ?from ?where ?returning table set }
 
 set:
   n = name; OP_EQ; e = expr; { n, e }
 
 delete:
-  DELETE; FROM; table = name; where = option(where);
-  { delete ~loc:(to_loc $loc) ?where table }
+  DELETE; FROM; table = name;
+  where = option(where);
+  returning = option(returning);
+  { delete ~loc:(to_loc $loc) ?where ?returning table }
 
 update_from:
   FROM; f = from; { f }
@@ -242,7 +251,7 @@ fields:
   fields = nonempty_flex_list(COMMA, field) { fields }
 
 field:
-  expr = expr; name = option(alias) { `F (Field { expr; name; is_used = true }) }
+  f = simple_field { `F f }
 | WITH; expr = expr; name = option(alias) { `F (Field { expr; name; is_used = false }) }
 | WITHSCOPE; names = scopename; name = alias; { `F (Field_with_scope (names, name)) }
 | name = FIELDSET_SPLICE;
@@ -254,6 +263,13 @@ field:
 | WITH; name = FIELDSET_SPLICE; LPAREN; args = flex_list(COMMA, scopename) RPAREN
   { `F (Field_fieldset {name=(to_loc $loc, name); args; is_used=false}) }
 | ELLIPSIS { `E }
+
+(* used in RETURNING clause *)
+simple_fields:
+  fields = nonempty_flex_list(COMMA, simple_field) { fields }
+
+%inline simple_field:
+  expr = expr; name = option(alias) { Field { expr; name; is_used = true } }
 
 from_one:
   table = name; name = option(alias) 

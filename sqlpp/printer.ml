@@ -140,9 +140,18 @@ class virtual ['ctx] printer =
 
     method private emit_select ctx (select : select) =
       let select = select.node in
+      self#emit ctx "SELECT ";
+      self#emit_fields ctx select.select_proj;
+      self#emit_option self#emit_from ctx select.select_from;
+      self#emit_option self#emit_where ctx select.select_where;
+      self#emit_option self#emit_group_by ctx select.select_group_by;
+      self#emit_option self#emit_having ctx select.select_having;
+      ()
+
+    method private emit_fields ctx fields =
       let select_fields =
         Seq.append
-          (List.to_seq select.select_proj
+          (List.to_seq fields
           |> Seq.filter (function Field f -> f.is_used | _ -> assert false))
           (Scope.scope_fields ctx.scope
           |> Seq.filter_map (fun f ->
@@ -153,13 +162,7 @@ class virtual ['ctx] printer =
                  else None))
         |> Seq.uniq equal_select_field
       in
-      self#emit ctx "SELECT ";
-      self#emit_seq self#emit_field ctx select_fields;
-      self#emit_option self#emit_from ctx select.select_from;
-      self#emit_option self#emit_where ctx select.select_where;
-      self#emit_option self#emit_group_by ctx select.select_group_by;
-      self#emit_option self#emit_having ctx select.select_having;
-      ()
+      self#emit_seq self#emit_field ctx select_fields
 
     method private emit_field ctx =
       function
@@ -236,10 +239,18 @@ class virtual ['ctx] printer =
               self#emit ctx ")")
             ctx rows
       | Insert_from_select select -> self#emit_select ctx select);
-      match insert.insert_on_conflict with
+      (match insert.insert_on_conflict with
       | Some On_conflict_ignore -> self#emit ctx " ON CONFLICT DO NOTHING"
       | Some On_conflict_replace -> self#emit ctx " ON CONFLICT DO UPDATE"
-      | None -> ()
+      | None -> ());
+      self#emit_returning ctx insert.insert_returning
+
+    method private emit_returning ctx fields =
+      match fields with
+      | [] -> ()
+      | fields ->
+          self#emit ctx " RETURNING ";
+          self#emit_fields ctx fields
 
     method private emit_delete ctx (delete : delete) =
       let delete = delete.node in
@@ -249,7 +260,8 @@ class virtual ['ctx] printer =
         (fun ctx expr ->
           self#emit ctx " WHERE ";
           self#emit_expr ctx expr)
-        ctx delete.delete_where
+        ctx delete.delete_where;
+      self#emit_returning ctx delete.delete_returning
 
     method private emit_update ctx (update : update) =
       let update = update.node in
@@ -267,7 +279,8 @@ class virtual ['ctx] printer =
         (fun ctx expr ->
           self#emit ctx " WHERE ";
           self#emit_expr ctx expr)
-        ctx update.update_where
+        ctx update.update_where;
+      self#emit_returning ctx update.update_returning
 
     method emit_query ctx ((_loc, query) : query pos) =
       match query with

@@ -20,7 +20,7 @@ module Todos : sig
   val find : id:int -> db -> t option
   (** [find ~id db] returns the todo with the given [id] from the database [db] *)
 
-  val insert : ?completed:bool -> ?project:string -> text:string -> db -> unit
+  val insert : ?completed:bool -> ?project:string -> text:string -> db -> int
   (** [insert ~completed ~text db] inserts a new todo with the given [text] and [completed] status into the database [db] *)
 
   val completed : id:int -> db -> unit
@@ -98,10 +98,11 @@ end = struct
 
   let insert ?(completed = false) ?(project = Db.default_project_id) ~text db =
     insert_project ~name:project db;
-    [%exec
+    [%fetch_option
       "INSERT INTO todos SET text=?text, completed=?completed, \
-       project=?project, created=now()"]
+       project=?project, created=now() RETURNING id"]
       ~text ~completed ~project db
+    |> Option.get
 
   let completed =
     [%exec "UPDATE todos SET completed=TRUE WHERE id=?id:int not null"]
@@ -181,7 +182,10 @@ let completed_t =
 let cmd ~name ~doc t = Cmd.v (Cmd.info name ~doc) t
 
 let todos_insert_cmd =
-  let f db project text = Todos.insert ?project ~text db in
+  let f db project text =
+    let id = Todos.insert ?project ~text db in
+    print_endline (Printf.sprintf "TODO %i inserted" id)
+  in
   cmd ~name:"todos-insert" ~doc:"insert a new todo into a database"
     Term.(const f $ db_t $ project_t $ text_t)
 

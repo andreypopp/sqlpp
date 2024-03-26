@@ -224,16 +224,15 @@ end = struct
     fun ctx p -> ctx.dependencies <- List.add_nodup ~eq p ctx.dependencies
 end
 
-let get_select_row scope select =
-  List.filter_map select.node.select_proj ~f:(function
-    | Field_with_scope _ | Field_fieldset _ ->
-        failwithf "get_select_row: not a field"
+let get_row scope fields =
+  List.filter_map fields ~f:(function
+    | Field_with_scope _ | Field_fieldset _ -> failwithf "get_row: not a field"
     | Field f when not f.is_used -> None
     | Field f -> (
         let name = Option.get_exn_or "impossible" f.name in
         match NT.find_opt scope.Scope.fields name with
         | Some f -> Some (name, f.ty)
-        | None -> failwithf "get_select_row: no such field"))
+        | None -> failwithf "get_row: no such field"))
 
 let resolve_field_dependency scope (scope_name, name) =
   let scope' =
@@ -425,7 +424,7 @@ let rec infer_expr ~(ctx : Expr_ctx.t) (expr : expr) : ty * expr =
   | Expr_app (f, args) -> infer_expr_app ~ctx f args
   | Expr_in (es, select) ->
       let scope, select = infer_select ~ctx:ctx.query_ctx select in
-      let row = get_select_row scope select in
+      let row = get_row scope select.node.select_proj in
       let es =
         let f e (_n, ty) = snd (check_expr ty ~ctx e) in
         match List.map2 es row ~f with
@@ -658,10 +657,17 @@ and infer_select ~ctx (select : select) : Scope.scope * select =
              e))
       select_having
   in
-  let scopes = ref scope.scopes in
+  let select_proj, scope = infer_select_fields ~ctx ~loc scope select_proj in
+  ( scope,
+    Syntax.select ~loc select_proj ?from:select_from ?where:select_where
+      ?group_by:select_group_by ?having:select_having ?order_by:select_order_by
+      ~is_open:select_is_open )
+
+and infer_select_fields ~ctx ~loc scope fields =
+  let scopes = ref scope.Scope.scopes in
   let current_scope () = { scope with scopes = !scopes } in
-  let select_proj =
-    List.mapi select_proj ~f:(fun i f ->
+  let fields =
+    List.mapi fields ~f:(fun i f ->
         let scope = current_scope () in
         match f with
         | Field_fieldset { name; args; is_used } ->
@@ -737,11 +743,7 @@ and infer_select ~ctx (select : select) : Scope.scope * select =
             else [ Field { f with expr; name = Some name } ])
     |> List.flatten
   in
-  let scope = current_scope () in
-  ( scope,
-    Syntax.select ~loc select_proj ?from:select_from ?where:select_where
-      ?group_by:select_group_by ?having:select_having ?order_by:select_order_by
-      ~is_open:select_is_open )
+  fields, current_scope ()
 
 and infer_from ~ctx ((loc, from) : from pos) =
   match from with
@@ -785,7 +787,13 @@ and infer_from_one ~ctx (loc, from) =
 
 and infer_insert ~ctx (insert : insert) =
   let loc = insert.loc in
-  let { insert_table; insert_columns; insert_from; insert_on_conflict } =
+  let {
+    insert_table;
+    insert_columns;
+    insert_from;
+    insert_on_conflict;
+    insert_returning;
+  } =
     insert.node
   in
   let table_scope, table = env_find_table ctx.env insert_table in
@@ -822,7 +830,7 @@ and infer_insert ~ctx (insert : insert) =
     | Insert_from_select select ->
         let scope, select = infer_select ~ctx select in
         Check_agg.run scope Check_agg.fold#fold_select select;
-        let row = get_select_row scope select in
+        let row = get_row scope select.node.select_proj in
         (match
            List.iter2 insert_columns row ~f:(fun col ((loc, _), ty) ->
                let f = find_field col in
@@ -846,47 +854,64 @@ and infer_insert ~ctx (insert : insert) =
   if not (List.is_empty missing_columns) then
     Report.errorf ~loc "missing required columns: %s"
       (String.concat ~sep:", " missing_columns);
+  let inner_scope =
+    let scopes = [ insert_table, Scope.S (non_null table_scope) ] in
+    { inner_scope with scopes }
+  in
+  let insert_returning, inner_scope =
+    infer_select_fields ~ctx ~loc inner_scope insert_returning
+  in
   {
     scope = Scope.scope_create ();
     inner_scope;
     params = ctx.params.params;
-    row = [];
+    row = get_row inner_scope insert_returning;
     query =
       ( loc,
         Query_insert
-          (Syntax.insert ~loc ?on_conflict:insert_on_conflict insert_table
-             insert_columns insert_from) );
+          (Syntax.insert ~loc ?on_conflict:insert_on_conflict
+             ~returning:insert_returning insert_table insert_columns
+             insert_from) );
   }
 
 and infer_delete ~ctx (delete : delete) =
   let loc = delete.loc in
-  let { delete_table; delete_where } = delete.node in
+  let { delete_table; delete_where; delete_returning } = delete.node in
   let table_scope = fst (env_find_table ctx.env delete_table) in
+  let inner_scope =
+    Scope.scope_create
+      ~scopes:[ delete_table, Scope.S (non_null table_scope) ]
+      ()
+  in
   let delete_where =
     match delete_where with
     | None -> None
     | Some e ->
-        let scope =
-          Scope.scope_create
-            ~scopes:[ delete_table, Scope.S (non_null table_scope) ]
-            ()
-        in
-        let ctx = Expr_ctx.make ~is_used:true scope ctx in
+        let ctx = Expr_ctx.make ~is_used:true inner_scope ctx in
         let _, e = check_expr (null bool) ~ctx e in
         Some e
   in
+  let delete_returning, inner_scope =
+    infer_select_fields ~ctx ~loc inner_scope delete_returning
+  in
   {
     scope = Scope.scope_create ();
-    inner_scope = Scope.scope_create ();
+    inner_scope;
     params = ctx.params.params;
-    row = [];
+    row = get_row inner_scope delete_returning;
     query =
-      loc, Query_delete (Syntax.delete ~loc ?where:delete_where delete_table);
+      ( loc,
+        Query_delete
+          (Syntax.delete ~loc ?where:delete_where ~returning:delete_returning
+             delete_table) );
   }
 
 and infer_update ~ctx (update : update) =
   let loc = update.loc in
-  let { update_table; update_set; update_where; update_from } = update.node in
+  let { update_table; update_set; update_where; update_from; update_returning }
+      =
+    update.node
+  in
   let table_scope = fst (env_find_table ctx.env update_table) in
   let scopes, update_from =
     match update_from with
@@ -916,6 +941,9 @@ and infer_update ~ctx (update : update) =
         ignore (subsumes ~loc:expr.loc ty ~sup:f.ty : ty);
         name, expr)
   in
+  let update_returning, scope =
+    infer_select_fields ~ctx ~loc scope update_returning
+  in
   Option.iter
     (Check_agg.run (Scope.scope_create ~scopes ()) Check_agg.fold#fold_from)
     update_from;
@@ -923,12 +951,12 @@ and infer_update ~ctx (update : update) =
     scope = Scope.scope_create ();
     inner_scope = scope;
     params = ctx.params.params;
-    row = [];
+    row = get_row scope update_returning;
     query =
       ( loc,
         Query_update
           (Syntax.update ~loc update_table update_set ?from:update_from
-             ?where:update_where) );
+             ?where:update_where ~returning:update_returning) );
   }
 
 and infer_query ~ctx (loc, query) =
@@ -936,7 +964,7 @@ and infer_query ~ctx (loc, query) =
   | Query_select select ->
       let scope, select = infer_select ~ctx select in
       Check_agg.run scope Check_agg.fold#fold_select select;
-      let row = get_select_row scope select in
+      let row = get_row scope select.node.select_proj in
       {
         scope;
         inner_scope = scope;

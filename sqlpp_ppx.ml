@@ -337,7 +337,7 @@ end = struct
         let loc = fst p in
         ptyp_arrow ~loc (Labelled (snd p)) (gent_ty ~loc rty) ty)
 
-  let gen_query_to_sql_ty params query k =
+  let gen_query_to_sql_ty params k =
     List.fold_left (sort_params params) ~init:k ~f:(fun ty (p, pty) ->
         let loc = fst p in
         ptyp_arrow ~loc (Labelled (snd p)) (gen_pty ~loc pty) ty)
@@ -385,26 +385,23 @@ end = struct
         match !mode with
         | `regular ->
             gen_query_to_sql query (fun sql ->
-                match query.query with
-                | _, Query_select _ ->
+                match query.row with
+                | [] -> [%expr fun () -> { Sqlpp_db.sql = [%e sql] }]
+                | row ->
                     [%expr
                       fun () ->
-                        let decode = [%e gen_fold query.row] in
-                        { Sqlpp_db.sql = [%e sql]; decode }]
-                | _ -> [%expr fun () -> { Sqlpp_db.sql = [%e sql] }])
+                        let decode = [%e gen_fold row] in
+                        { Sqlpp_db.sql = [%e sql]; decode }])
         | `test -> [%expr assert false]
       in
       let t =
-        match query.query with
-        | _, Query_select _ ->
+        match query.row with
+        | [] -> gen_query_to_sql_ty query.params [%type: unit -> Sqlpp_db.stmt]
+        | row ->
             let t =
-              [%type:
-                unit -> ([%t gen_fold_ty query.row], 'acc) Sqlpp_db.query]
+              [%type: unit -> ([%t gen_fold_ty row], 'acc) Sqlpp_db.query]
             in
-            gen_query_to_sql_ty query.params query.query [%type: [%t t]]
-        | _ ->
-            gen_query_to_sql_ty query.params query.query
-              [%type: unit -> Sqlpp_db.stmt]
+            gen_query_to_sql_ty query.params [%type: [%t t]]
       in
       [%expr ([%e e] : [%t t])]
     with Sqlpp.Report.Error report ->
@@ -456,7 +453,7 @@ end = struct
           | Some t -> ptyp_constr ~loc t []
         in
         let t = [%type: Sqlpp_db.Db.db -> [%t k_typ t]] in
-        gen_query_to_sql_ty query.params query.query [%type: [%t t]]
+        gen_query_to_sql_ty query.params [%type: [%t t]]
       in
       [%expr ([%e e] : [%t t])]
     with Sqlpp.Report.Error report ->
@@ -494,8 +491,7 @@ end = struct
             [%expr fun db -> Sqlpp_db.exec db { Sqlpp_db.sql = [%e sql] }])
       in
       let t =
-        gen_query_to_sql_ty query.params query.query
-          [%type: Sqlpp_db.Db.db -> unit]
+        gen_query_to_sql_ty query.params [%type: Sqlpp_db.Db.db -> unit]
       in
       [%expr ([%e e] : [%t t])]
     with Sqlpp.Report.Error report ->

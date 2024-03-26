@@ -64,6 +64,7 @@ let string_of_token = function
   | TABLE -> "TABLE"
   | FIELDSET -> "FIELDSET"
   | FIELDSET_SPLICE name -> sprintf "...%s" name
+  | RETURNING -> "RETURNING"
 
 exception Error of Lexing.position * string
 
@@ -170,6 +171,7 @@ let rec token buf =
   | m, a, t, c, h -> MATCH
   | w, i, t, h -> WITH
   | w, i, t, h, s, c, o, p, e -> WITHSCOPE
+  | r, e, t, u, r, n, i, n, g -> RETURNING
   | ' ' | '\t' -> token buf
   | '\n' -> token buf
   | integer_first, Star integer_rest ->

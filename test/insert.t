@@ -1,5 +1,6 @@
 
   $ alias p='./test.exe sqlpp-analyze --require ./schema.sql'
+  $ alias s='./test.exe sqlpp-sql --require ./schema.sql'
 
   $ p "insert into profiles(user_id, settings, info)
   >    values (1, 's', 'i')"
@@ -35,6 +36,11 @@ test alternative syntax with `SET`:
   $ p "insert into profiles set user_id=?id, settings='s', info='i'"
   INSERT INTO profiles(user_id, settings, info)
   VALUES (?id, 's', 'i')
+
+`RETURNING` clause is supported:
+
+  $ s "insert into profiles set user_id=1, settings='s', info='i' returning user_id"
+  INSERT INTO "profiles" ("user_id", "settings", "info") VALUES (1, 's', 'i') RETURNING "profiles"."user_id" AS "user_id"
 
 TODO: error message is off
   $ p "insert into profiles(user_id, settings, info)
