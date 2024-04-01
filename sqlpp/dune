@@ -12,8 +12,7 @@
   pprint
   containers
   sedlex
-  ppx_compare
-  hashcons))
+  ppx_compare))
 
 (menhir
  (explain true)
