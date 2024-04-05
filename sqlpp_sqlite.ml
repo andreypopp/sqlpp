@@ -4,6 +4,8 @@ module Sqlpp_db = Make (struct
   type db = Sqlite3.db
   type row = Sqlite3.Data.t array
   type query = Sqlite3.stmt
+  type date = float
+  type datetime = float
 
   let fold ~init ~f db sql =
     try
@@ -20,6 +22,7 @@ module Sqlpp_db = Make (struct
       acc
     with Sqlite3.SqliteError err -> failwith (Sqlite3.errmsg db)
 
+  let exec = fold ~init:() ~f:(fun _row () -> ())
   let or_NULL f = function None -> "NULL" | Some v -> f v
   let encode_BOOL = function true -> "TRUE" | false -> "FALSE"
   let encode_BOOL_NULL = or_NULL encode_BOOL
@@ -61,7 +64,7 @@ module Sqlpp_db = Make (struct
   let decode_STRING : string decode =
    fun row idx -> match row.(idx) with TEXT s -> s | _ -> assert false
 
-  let decode_DATE : float decode =
+  let decode_DATE : date decode =
    fun row idx ->
     match row.(idx) with
     | TEXT s ->
@@ -83,7 +86,7 @@ module Sqlpp_db = Make (struct
         t
     | _ -> failwith "expected date"
 
-  let decode_DATETIME : float decode =
+  let decode_DATETIME : datetime decode =
    fun row idx ->
     match row.(idx) with
     | TEXT s ->

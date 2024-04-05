@@ -207,9 +207,14 @@ module type DB = sig
   type db
   type row
   type query
+  type date
+  type datetime
 
   val fold : init:'a -> f:(row -> 'a -> 'a) -> db -> string -> 'a
-  (** execute a an SQL query and fold over the result *)
+  (** execute an SQL query that returns something and collapse the result *)
+
+  val exec : db -> string -> unit
+  (** execute an SQL query that returns nothing and collapse the result *)
 
   (* encoding *)
   type 'a encode := 'a -> string
@@ -222,10 +227,10 @@ module type DB = sig
   val encode_FLOAT_NULL : float option encode
   val encode_STRING : string encode
   val encode_STRING_NULL : string option encode
-  val encode_DATE : float encode
-  val encode_DATE_NULL : float option encode
-  val encode_DATETIME : float encode
-  val encode_DATETIME_NULL : float option encode
+  val encode_DATE : date encode
+  val encode_DATE_NULL : date option encode
+  val encode_DATETIME : datetime encode
+  val encode_DATETIME_NULL : datetime option encode
 
   (* decoding *)
   type 'a decode := row -> int -> 'a
@@ -239,24 +244,25 @@ module type DB = sig
   val decode_FLOAT_NULL : float option decode
   val decode_STRING : string decode
   val decode_STRING_NULL : string option decode
-  val decode_DATE : float decode
-  val decode_DATE_NULL : float option decode
-  val decode_DATETIME : float decode
-  val decode_DATETIME_NULL : float option decode
+  val decode_DATE : date decode
+  val decode_DATE_NULL : date option decode
+  val decode_DATETIME : datetime decode
+  val decode_DATETIME_NULL : datetime option decode
 
   open Syntax
 
   (** printer for SQL queries *)
-  class virtual ['ctx] printer : object
-    method virtual emit : 'ctx Printer.ctx -> string -> unit
+  class virtual ['ctx] printer :
+    object
+      method virtual emit : 'ctx Printer.ctx -> string -> unit
 
-    method virtual emit_Expr_match :
-      'ctx Printer.ctx -> name -> (name * name list * expr) list -> unit
+      method virtual emit_Expr_match :
+        'ctx Printer.ctx -> name -> (name * name list * expr) list -> unit
 
-    method virtual emit_Expr_param : 'ctx Printer.ctx -> name -> unit
-    method emit_query : 'ctx Printer.ctx -> query pos -> unit
-    method emit_expr : 'ctx Printer.ctx -> expr -> unit
-  end
+      method virtual emit_Expr_param : 'ctx Printer.ctx -> name -> unit
+      method emit_query : 'ctx Printer.ctx -> query pos -> unit
+      method emit_expr : 'ctx Printer.ctx -> expr -> unit
+    end
 end
 
 type params = string Syntax.NM.t
@@ -292,7 +298,7 @@ module Make (Db : DB) : BACKEND with module Db = Db = struct
   type ('f, 'a) query = { sql : string; decode : 'f -> Db.row -> 'a -> 'a }
 
   let fold ~init ~f db q = Db.fold ~init ~f:(q.decode f) db q.sql
-  let exec db (q : stmt) = Db.fold ~init:() ~f:(fun _row () -> ()) db q.sql
+  let exec db (q : stmt) = Db.exec db q.sql
 
   type printer_ctx = {
     env : Env.t;
