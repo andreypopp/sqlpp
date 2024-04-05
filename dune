@@ -13,6 +13,14 @@
  (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx sqlite3))
 
 (library
+ (name sqlpp_mariadb)
+ (public_name sqlpp.mariadb)
+ (modules sqlpp_mariadb)
+ (kind ppx_rewriter)
+ (flags -open Sqlpp_std)
+ (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx mariadb))
+
+(library
  (name sqlpp_manage)
  (public_name sqlpp.manage)
  (modules sqlpp_manage)
