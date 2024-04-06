@@ -6,7 +6,7 @@
 
 (library
  (name sqlpp_sqlite)
- (public_name sqlpp.sqlite)
+ (public_name sqlpp_sqlite)
  (modules sqlpp_sqlite)
  (kind ppx_rewriter)
  (flags -open Sqlpp_std)
@@ -18,8 +18,8 @@
  (modules sqlpp_manage)
  (flags -open Sqlpp_std)
  (preprocess
-  (pps sqlpp.sqlite))
- (libraries cmdliner sqlpp sqlpp.std sqlpp.sqlite sqlite3))
+  (pps sqlpp_sqlite))
+ (libraries cmdliner sqlpp sqlpp.std sqlpp_sqlite sqlite3))
 
 (library
  (name sqlpp_ppx)

@@ -3,13 +3,13 @@
  (modules main)
  (preprocess
   (pps db))
- (libraries db cmdliner sqlpp sqlpp.sqlite))
+ (libraries db cmdliner sqlpp sqlpp_sqlite))
 
 (library
  (name db)
  (modules db)
  (kind ppx_rewriter)
- (libraries sqlpp sqlpp.sqlite sqlpp.manage))
+ (libraries sqlpp sqlpp_sqlite sqlpp.manage))
 
 (cram
  (deps ./main.exe))
