@@ -12,8 +12,8 @@
  (synopsis "typesafe SQL for OCaml via preprocessing")
  (depends (ocaml (>= 4.14))
           dune yojson 
-          mehnir 
-          menhirLib 
+          menhir 
+          mehnirLib 
           pprint 
           re 
           containers 
