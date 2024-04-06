@@ -22,6 +22,7 @@
           ppx_hash
           ppxlib
           cmdliner
+          (ocamlformat :with-test)
           (ppx_blob :with-test)))
 
 (package

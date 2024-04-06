@@ -20,6 +20,7 @@ depends: [
   "ppx_hash"
   "ppxlib"
   "cmdliner"
+  "ocamlformat" {with-test}
   "ppx_blob" {with-test}
   "odoc" {with-doc}
 ]
