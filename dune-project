@@ -13,7 +13,7 @@
  (depends (ocaml (>= 4.14))
           dune yojson 
           menhir 
-          mehnirLib 
+          menhirLib 
           pprint 
           re 
           containers 
