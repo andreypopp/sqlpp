@@ -21,6 +21,7 @@
           ppx_compare
           ppx_hash
           ppxlib
+          cmdliner
           (ppx_blob :with-test)))
 
 (package
