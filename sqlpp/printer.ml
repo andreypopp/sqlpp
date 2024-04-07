@@ -42,6 +42,28 @@ let quote_ident =
     Buffer.clear buf;
     s
 
+(* non-standard in SQL but used by MySQL/MariaDB *)
+let quote_ident_backticks =
+  let buf = Buffer.create 16 in
+  fun v ->
+    let len = String.length v in
+    let rec loop s i =
+      if i = len then Buffer.add_substring buf v s (i - s)
+      else
+        match String.unsafe_get v i with
+        | '`' ->
+            if s > i then Buffer.add_substring buf v s (i - s);
+            Buffer.add_string buf "``";
+            loop (i + 1) (i + 1)
+        | _ -> loop s (i + 1)
+    in
+    Buffer.add_char buf '`';
+    loop 0 0;
+    Buffer.add_char buf '`';
+    let s = Buffer.contents buf in
+    Buffer.clear buf;
+    s
+
 type 'ctx ctx = { ctx : 'ctx; scope : Scope.scope }
 
 class virtual ['ctx] printer =

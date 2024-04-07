@@ -10,7 +10,7 @@ module Sqlpp_db = Make (struct
   type datetime = M.Time.t
 
   let fold' ~init ~f ~handle_res db sql =
-    let open CCResult in
+    let open Result in
     let result =
       let* stmt = M.prepare db sql in
       let* res = M.Stmt.execute stmt Array.empty in
@@ -28,7 +28,7 @@ module Sqlpp_db = Make (struct
         res
         |> M.Res.fetch (module M.Row.Array)
         |> Result.flat_map
-             (CCOption.map_or (fun x -> loop (f x acc)) ~default:(Ok acc))
+             (Option.map_or (fun x -> loop (f x acc)) ~default:(Ok acc))
       in
       loop init
     in
@@ -101,7 +101,7 @@ module Sqlpp_db = Make (struct
       method! private emit_Lit_int ctx s = self#emit ctx (encode_INT s)
 
       method! private emit_name ctx (_, name) =
-        self#emit ctx (Printf.sprintf "`%s`" name)
+        self#emit ctx (Printer.quote_ident_backticks name)
     end
 end)
 
