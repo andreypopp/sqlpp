@@ -7,6 +7,9 @@ init:
 build test fmt clean watch:
 	dune $@
 
+test_mariadb:
+	dune build @test_sqlpp_mariadb
+
 .PHONY: b
 b: build
 
