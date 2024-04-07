@@ -22,11 +22,12 @@ project structure:
 - `sqlpp` implements sqlpp language parser, analyzer and generic SQL printer
 - `sqlpp_ppx` implements typed embedding into ocaml as ppx
 - `sqlpp_sqlite` sqlite dialect/driver
+- `sqlpp_mariadb` mariadb dialect/driver, uses lwt for I/O
 - `sqlpp_manage` database management (sqlite only for now)
 
 example project structure:
-- `example/db.ml` defines the database schema, also acts as a ppx
-- `example/main.ml` the application itself, also database management interface
+- `test/sqlpp_sqlite/db.ml` defines the database schema, also acts as a ppx
+- `test/sqlpp_sqlite/main.ml` the application itself, also database management interface
 
 ## features
 
