@@ -26,8 +26,9 @@ jobs:
       - name: checkout tree
         uses: actions/checkout@v4
 
-      - name: install apt packages
-        run: sudo apt-get install -y mariadb-server
+      # TODO: needed once test_sqlpp_mariadb is enabled
+      # - name: install apt packages
+      #   run: sudo apt-get install -y mariadb-server
 
       - name: set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
@@ -42,4 +43,5 @@ jobs:
 
       - run: opam exec -- dune runtest
 
-      - run: opam exec -- dune build @test_sqlpp_mariadb
+      # TODO: need to find a way to start mariadb for tests properly
+      # - run: opam exec -- dune build @test_sqlpp_mariadb
