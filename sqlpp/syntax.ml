@@ -153,6 +153,8 @@ and selectsyn = {
   select_group_by : expr list option;
   select_having : expr option;
   select_order_by : (expr * dir) list option;
+  select_limit : expr option;
+  select_offset : expr option;
   select_is_open : bool;
 }
 (** SELECT ... FROM ... *)
@@ -268,7 +270,7 @@ module Eq_select = Eq_class.Make (struct
 end)
 
 let select ?(loc = dummy_loc) ?(is_open = false) ?group_by ?having ?order_by
-    ?where ?from proj =
+    ?where ?limit ?offset ?from proj =
   let node =
     {
       select_proj = proj;
@@ -277,6 +279,8 @@ let select ?(loc = dummy_loc) ?(is_open = false) ?group_by ?having ?order_by
       select_group_by = group_by;
       select_having = having;
       select_order_by = order_by;
+      select_limit = limit;
+      select_offset = offset;
       select_is_open = is_open;
     }
   in
@@ -500,6 +504,8 @@ class ['ctx] format =
         select_group_by;
         select_having;
         select_order_by;
+        select_limit;
+        select_offset;
       } =
         select.node
       in
@@ -515,7 +521,9 @@ class ['ctx] format =
         ^^ self#format_where ctx select_where
         ^^ self#format_group_by ctx select_group_by
         ^^ self#format_having ctx select_having
-        ^^ self#format_order_by ctx select_order_by)
+        ^^ self#format_order_by ctx select_order_by
+        ^^ self#format_limit ctx select_limit
+        ^^ self#format_offset ctx select_offset)
 
     method format_insert ctx insert =
       let { insert_table; insert_columns; insert_from; insert_returning } =
@@ -710,6 +718,20 @@ class ['ctx] format =
             (break 1
             ^^ self#format_kw "WHERE"
             ^^ nest 2 (break 1 ^^ self#format_expr None ctx expr))
+
+    method format_limit ctx =
+      function
+      | None -> empty
+      | Some e ->
+          group
+            (break 1 ^^ self#format_kw "LIMIT" ^^> self#format_expr None ctx e)
+
+    method format_offset ctx =
+      function
+      | None -> empty
+      | Some e ->
+          group
+            (break 1 ^^ self#format_kw "OFFSET" ^^> self#format_expr None ctx e)
 
     method format_having ctx =
       function

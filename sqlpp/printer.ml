@@ -168,6 +168,9 @@ class virtual ['ctx] printer =
       self#emit_option self#emit_where ctx select.select_where;
       self#emit_option self#emit_group_by ctx select.select_group_by;
       self#emit_option self#emit_having ctx select.select_having;
+      self#emit_option self#emit_order_by ctx select.select_order_by;
+      self#emit_option self#emit_limit ctx select.select_limit;
+      self#emit_option self#emit_offset ctx select.select_offset;
       ()
 
     method private emit_fields ctx fields =
@@ -242,6 +245,23 @@ class virtual ['ctx] printer =
 
     method private emit_having ctx (expr : expr) =
       self#emit ctx " HAVING ";
+      self#emit_expr ctx expr
+
+    method private emit_order_by ctx (exprs : (expr * dir) list) =
+      self#emit ctx " ORDER BY ";
+      let emit_field ctx (expr, (dir : dir)) =
+        self#emit_expr ctx expr;
+        self#emit ctx
+          (match dir with Dir_asc -> " ASC" | Dir_desc -> " DESC")
+      in
+      self#emit_list emit_field ctx exprs
+
+    method private emit_limit ctx (expr : expr) =
+      self#emit ctx " LIMIT ";
+      self#emit_expr ctx expr
+
+    method private emit_offset ctx (expr : expr) =
+      self#emit ctx " OFFSET ";
       self#emit_expr ctx expr
 
     method private emit_insert ctx (insert : insert) =

@@ -65,6 +65,8 @@ let string_of_token = function
   | FIELDSET -> "FIELDSET"
   | FIELDSET_SPLICE name -> sprintf "...%s" name
   | RETURNING -> "RETURNING"
+  | LIMIT -> "LIMIT"
+  | OFFSET -> "OFFSET"
 
 exception Error of Lexing.position * string
 
@@ -172,6 +174,8 @@ let rec token buf =
   | w, i, t, h -> WITH
   | w, i, t, h, s, c, o, p, e -> WITHSCOPE
   | r, e, t, u, r, n, i, n, g -> RETURNING
+  | l, i, m, i, t -> LIMIT
+  | o, f, f, s, e, t -> OFFSET
   | ' ' | '\t' -> token buf
   | '\n' -> token buf
   | integer_first, Star integer_rest ->

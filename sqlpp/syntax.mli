@@ -82,6 +82,8 @@ and selectsyn = {
   select_group_by : expr list option;
   select_having : expr option;
   select_order_by : (expr * dir) list option;
+  select_limit : expr option;
+  select_offset : expr option;
   select_is_open : bool;
 }
 
@@ -191,6 +193,8 @@ val select :
   ?having:expr ->
   ?order_by:(expr * dir) list ->
   ?where:expr ->
+  ?limit:expr ->
+  ?offset:expr ->
   ?from:from pos ->
   select_field list ->
   select
@@ -327,4 +331,6 @@ class ['ctx] format : object
   method format_update_set : 'ctx -> name * expr -> document
   method format_values : 'ctx -> expr list -> document
   method format_where : 'ctx -> expr option -> document
+  method format_limit : 'ctx -> expr option -> document
+  method format_offset : 'ctx -> expr option -> document
 end

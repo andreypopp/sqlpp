@@ -621,6 +621,8 @@ and infer_select ~ctx (select : select) : Scope.scope * select =
     select_having;
     select_order_by;
     select_is_open;
+    select_limit;
+    select_offset;
   } =
     select.node
   in
@@ -657,11 +659,38 @@ and infer_select ~ctx (select : select) : Scope.scope * select =
              e))
       select_having
   in
+  let select_order_by =
+    Option.map
+      (List.map ~f:(fun (e, dir) ->
+           let _ty, e =
+             infer_expr ~ctx:(Expr_ctx.make ~is_used:true scope ctx) e
+           in
+           e, dir))
+      select_order_by
+  in
+  let select_limit =
+    Option.map
+      (fun e ->
+        snd
+          (check_expr (non_null int)
+             ~ctx:(Expr_ctx.make ~is_used:true scope ctx)
+             e))
+      select_limit
+  in
+  let select_offset =
+    Option.map
+      (fun e ->
+        snd
+          (check_expr (non_null int)
+             ~ctx:(Expr_ctx.make ~is_used:true scope ctx)
+             e))
+      select_offset
+  in
   let select_proj, scope = infer_select_fields ~ctx ~loc scope select_proj in
   ( scope,
     Syntax.select ~loc select_proj ?from:select_from ?where:select_where
       ?group_by:select_group_by ?having:select_having ?order_by:select_order_by
-      ~is_open:select_is_open )
+      ?limit:select_limit ?offset:select_offset ~is_open:select_is_open )
 
 and infer_select_fields ~ctx ~loc scope fields =
   let scopes = ref scope.Scope.scopes in

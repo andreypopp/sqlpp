@@ -55,6 +55,8 @@ let to_loc (loc_start, loc_end) =
 %token FIELDSET
 %token EXPR
 %token RETURNING
+%token LIMIT
+%token OFFSET
 %token <string> FIELDSET_SPLICE
 %token <string> PARAM
 
@@ -146,7 +148,7 @@ select:
         ?having:None
         ?order_by:None
         ~is_open
-    | Some (from, where, group_by, having, order_by) ->
+    | Some (from, where, group_by, having, order_by, limit, offset) ->
       select 
         proj
         ~loc:(to_loc $loc)
@@ -155,6 +157,8 @@ select:
         ?group_by
         ?having
         ?order_by
+        ?limit
+        ?offset
         ~is_open
   }
 
@@ -164,12 +168,16 @@ select_tail:
   select_group_by = option(group_by);
   select_having = option(having);
   select_order_by = option(order_by);
+  select_limit = option(limit);
+  select_offset = option(offset);
   {
     select_from,
     select_where,
     select_group_by,
     select_having,
-    select_order_by
+    select_order_by,
+    select_limit,
+    select_offset
   }
 
 select_from:
@@ -235,6 +243,12 @@ having:
 
 order_by:
   ORDER; BY; fields = nonempty_flex_list(COMMA, order) { fields }
+
+limit:
+  LIMIT; expr = expr; { expr }
+
+offset:
+  OFFSET; expr = expr; { expr }
 
 group_by:
   GROUP; BY; fields = nonempty_flex_list(COMMA, expr) { fields }
