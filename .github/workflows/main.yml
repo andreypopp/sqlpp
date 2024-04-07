@@ -42,6 +42,6 @@ jobs:
       - run: opam exec -- dune build
 
       - run: opam exec -- dune runtest
-
+      - run: opam exec -- dune build @test_sqlpp_sqlite
       # TODO: need to find a way to start mariadb for tests properly
       # - run: opam exec -- dune build @test_sqlpp_mariadb
