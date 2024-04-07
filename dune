@@ -18,7 +18,7 @@
  (modules sqlpp_mariadb)
  (kind ppx_rewriter)
  (flags -open Sqlpp_std)
- (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx mariadb))
+ (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx lwt lwt.unix mariadb))
 
 (library
  (name sqlpp_manage)

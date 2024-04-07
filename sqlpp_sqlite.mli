@@ -1,4 +1,5 @@
 open Sqlpp
+module BlockingIO : IO with type 'a t = 'a
 
 (** Database backend interface *)
 module Sqlpp_db :
@@ -6,6 +7,7 @@ module Sqlpp_db :
     with type Db.db = Sqlite3.db
      and type Db.date = float
      and type Db.datetime = float
+     and module IO = BlockingIO
 
 val env : Env.t
 (** Default database environment. *)

@@ -1,9 +1,5 @@
 open Sqlpp_mariadb
-module M = Mariadb.Blocking
-
-let assert_ok = function
-  | Ok v -> v
-  | Error (code, msg) -> failwith (Printf.sprintf "Error %d: %s" code msg)
+open Sqlpp_mariadb.IO
 
 [%%sqlpp.env
 {|
@@ -29,32 +25,46 @@ let list_planets =
        from planets
        order by planet_id |}]
 
+let assert_ok = function
+  | Ok v -> v
+  | Error (code, msg) -> failwith (Printf.sprintf "ERROR %d: %s" code msg)
+
+let test_planets =
+  [
+    0, "Tatooine", Some "arid", 200000;
+    1, "Alderaan", Some "temperate", 2000000000;
+    2, "Yavin IV", Some "temperate, tropical", 1000;
+    3, "Hoth", Some "frozen", 0;
+    4, "Dagobah", Some "murky", 0;
+    5, "Bespin", Some "temperate", 6000000;
+    6, "Endor", Some "forests, mountains, lakes", 30000000;
+    7, "Naboo", Some "temperate", 4500000000;
+    8, "Coruscant", Some "temperate", 1000000000000;
+    9, "Kamino", None, 1000000000;
+  ]
+
 let () =
-  print_endline "connecting to mariadb...";
-  let c = assert_ok @@ M.connect () ~db:"sw" ~socket:"/tmp/mariadb.socket" in
-  print_endline "inserting planets...";
-  List.iteri
-    (fun planet_id (name, climate, population) ->
-      insert_planet c ~planet_id ~name ~climate ~population)
-    [
-      "Tatooine", Some "arid", 200000;
-      "Alderaan", Some "temperate", 2000000000;
-      "Yavin IV", Some "temperate, tropical", 1000;
-      "Hoth", Some "frozen", 0;
-      "Dagobah", Some "murky", 0;
-      "Bespin", Some "temperate", 6000000;
-      "Endor", Some "forests, mountains, lakes", 30000000;
-      "Naboo", Some "temperate", 4500000000;
-      "Coruscant", Some "temperate", 1000000000000;
-      "Kamino", None, 1000000000;
-    ];
-  print_endline "listing planets...";
-  let planets = list_planets c in
-  List.iter
-    (fun (planet_id, name, climate, population) ->
-      let climate = Option.value ~default:"-" climate in
-      Printf.printf "planet_id=%d, name=%s, climate=%s, population=%d\n"
-        planet_id name climate population)
-    planets;
-  print_endline "done";
-  ()
+  assert_ok
+  @@ Lwt_main.run
+       (print_endline "connecting to mariadb...";
+        Mariadb_lwt.connect () ~db:"sw" ~socket:"/tmp/mariadb.socket"
+        >>= fun conn ->
+        print_endline "inserting planets...";
+        let rec insert_loop xs =
+          match xs with
+          | [] -> return ()
+          | (planet_id, name, climate, population) :: xs ->
+              insert_planet conn ~planet_id ~name ~climate ~population
+              >>= fun () -> insert_loop xs
+        in
+        insert_loop test_planets >>= fun () ->
+        print_endline "listing planets...";
+        list_planets conn >>= fun planets ->
+        List.iter
+          (fun (planet_id, name, climate, population) ->
+            let climate = Option.value ~default:"-" climate in
+            Printf.printf "planet_id=%d, name=%s, climate=%s, population=%d\n"
+              planet_id name climate population)
+          planets;
+        print_endline "done";
+        Lwt.return_ok ())

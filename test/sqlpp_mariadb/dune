@@ -2,7 +2,7 @@
  (name main)
  (modules main)
  (preprocess (pps sqlpp_mariadb))
- (libraries cmdliner sqlpp sqlpp_mariadb))
+ (libraries cmdliner sqlpp sqlpp_mariadb lwt))
 
 (cram
  (alias test_sqlpp_mariadb)

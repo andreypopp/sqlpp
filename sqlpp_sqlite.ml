@@ -1,6 +1,15 @@
 open Sqlpp
 
+module BlockingIO = struct
+  type 'a t = 'a
+
+  let ( >>= ) x f = f x
+  let return x = x
+end
+
 module Sqlpp_db = Make (struct
+  module IO = BlockingIO
+
   type db = Sqlite3.db
   type row = Sqlite3.Data.t array
   type query = Sqlite3.stmt

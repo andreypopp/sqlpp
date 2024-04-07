@@ -442,7 +442,9 @@ end = struct
               fun db ->
                 let decode = [%e fold] in
                 let q = { Sqlpp_db.sql = [%e sql]; decode } in
-                [%e k_acc [%expr Sqlpp_db.fold db q ~init:[] ~f:Stdlib.Fun.id]]])
+                Sqlpp_db.IO.( >>= )
+                  (Sqlpp_db.fold db q ~init:[] ~f:Stdlib.Fun.id) (fun e ->
+                    [%e k_acc [%expr e]])])
       in
       let t =
         let t =
@@ -464,20 +466,20 @@ end = struct
   let fetch_list_expression ~ctxt ((src, _) as x) =
     let loc = src.loc in
     fetch_list_expression' ~ctxt x
-      ~k_typ:(fun t -> [%type: [%t t] list])
-      ~k_acc:(fun e -> [%expr List.rev [%e e]])
+      ~k_typ:(fun t -> [%type: [%t t] list Sqlpp_db.IO.t])
+      ~k_acc:(fun e -> [%expr Sqlpp_db.IO.return (List.rev [%e e])])
 
   let fetch_option_expression ~ctxt ((src, _) as x) =
     let loc = src.loc in
     (* TODO: need to make it throw on 2nd element and not wait till the whole
        list is computed *)
     fetch_list_expression' ~ctxt x
-      ~k_typ:(fun t -> [%type: [%t t] option])
+      ~k_typ:(fun t -> [%type: [%t t] option Sqlpp_db.IO.t])
       ~k_acc:(fun acc ->
         [%expr
           match [%e acc] with
-          | [] -> None
-          | [ x ] -> Some x
+          | [] -> Sqlpp_db.IO.return None
+          | [ x ] -> Sqlpp_db.IO.return (Some x)
           | _ -> failwith "expected one row"])
 
   let exec_expression ~ctxt src =
@@ -491,7 +493,8 @@ end = struct
             [%expr fun db -> Sqlpp_db.exec db { Sqlpp_db.sql = [%e sql] }])
       in
       let t =
-        gen_query_to_sql_ty query.params [%type: Sqlpp_db.Db.db -> unit]
+        gen_query_to_sql_ty query.params
+          [%type: Sqlpp_db.Db.db -> unit Sqlpp_db.IO.t]
       in
       [%expr ([%e e] : [%t t])]
     with Sqlpp.Report.Error report ->
