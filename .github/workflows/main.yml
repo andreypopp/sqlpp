@@ -26,6 +26,9 @@ jobs:
       - name: checkout tree
         uses: actions/checkout@v4
 
+      - name: install apt packages
+        run: sudo apt-get install -y mariadb-server
+
       - name: set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
         with:
