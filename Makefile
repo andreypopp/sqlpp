@@ -19,9 +19,3 @@ test_sqlite:
 
 .PHONY: b
 b: build
-
-.PHONY: commit
-commit:
-	git add -u .
-	git commit --amend --no-edit
-	git push --force
