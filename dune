@@ -14,7 +14,7 @@
 
 (library
  (name sqlpp_mariadb)
- (public_name sqlpp.mariadb)
+ (public_name sqlpp_mariadb)
  (modules sqlpp_mariadb)
  (kind ppx_rewriter)
  (flags -open Sqlpp_std)

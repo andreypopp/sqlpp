@@ -9,7 +9,7 @@
 
 (package
  (name sqlpp)
- (synopsis "typesafe SQL for OCaml via preprocessing")
+ (synopsis "Typesafe SQL for OCaml via preprocessing.")
  (depends (ocaml (>= 4.14))
           dune yojson 
           menhir 
@@ -27,5 +27,10 @@
 
 (package
  (name sqlpp_sqlite)
- (synopsis "sqlite backend for sqlpp")
+ (synopsis "Sqlite3 backend for sqlpp.")
  (depends (ocaml (>= 4.14)) dune sqlpp pprint sqlite3))
+
+(package
+ (name sqlpp_mariadb)
+ (synopsis "MariaDB backend for sqlpp.")
+ (depends (ocaml (>= 4.14)) dune sqlpp pprint mariadb))
