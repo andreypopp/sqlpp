@@ -1,0 +1,10 @@
+(lang dune 3.14)
+
+(name sqlpp_example_todo)
+
+(generate_opam_files false)
+
+(package
+ (name sqlpp_example_todo)
+ (synopsis "Typesafe SQL for OCaml via preprocessing.")
+ (depends (ocaml (>= 4.14)) dune sqlpp sqlpp_sqlite cmdliner))

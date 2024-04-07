@@ -1,12 +1,15 @@
 (executable
  (name main)
  (modules main)
+ (public_name sqlpp-example-todo-db)
+ (package sqlpp_example_todo)
  (preprocess
   (pps db))
  (libraries db cmdliner sqlpp sqlpp_sqlite))
 
 (library
  (name db)
+ (public_name sqlpp_example_todo.db)
  (modules db)
  (kind ppx_rewriter)
  (libraries sqlpp sqlpp_sqlite sqlpp.manage))
