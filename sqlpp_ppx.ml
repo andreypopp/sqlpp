@@ -157,26 +157,20 @@ let name_to_lident name =
 
 let name_to_label (loc, txt) = { Location.loc; txt }
 
-module type CONFIG = sig
-  module Sqlpp_db : Sqlpp.BACKEND
-end
-
-module Make (C : CONFIG) : sig
+module Make (Db : DB) : sig
   val env : Sqlpp.Env.t
   val register : unit -> unit
 end = struct
   let env = Sqlpp.Env.create ()
 
-  module Sqlpp_db = C.Sqlpp_db
-
-  let sqlpp_backend ~loc name =
-    let txt = Longident.parse (sprintf "Sqlpp_db.Db.%s" name) in
+  let sqlpp_types ~loc name =
+    let txt = Longident.parse (sprintf "Sqlpp_types.%s" name) in
     pexp_ident ~loc { loc; txt }
 
   let rec print_to_expression =
     let printer =
       object (self)
-        inherit [Printer_ctx.t * pty NM.t] Sqlpp_db.Db.printer
+        inherit [Printer_ctx.t * pty NM.t] Db.printer
         method emit { ctx = p, ps; _ } s = Printer_ctx.emit_string p s
 
         method emit_Expr_param ({ ctx = p, ps; _ } as ctx) name =
@@ -204,10 +198,9 @@ end = struct
                        type annotation"
                       (ty_to_string ty) (snd name)
                 | `non_null, Ty t ->
-                    sqlpp_backend ~loc:(fst t) (sprintf "encode_%s" (snd t))
+                    sqlpp_types ~loc:(fst t) (sprintf "encode_%s" (snd t))
                 | `null, Ty t ->
-                    sqlpp_backend ~loc:(fst t)
-                      (sprintf "encode_%s_NULL" (snd t))
+                    sqlpp_types ~loc:(fst t) (sprintf "encode_%s_NULL" (snd t))
               in
               let loc = fst name in
               Printer_ctx.emit p (E [%expr [%e encode] [%e id]])
@@ -296,8 +289,8 @@ end = struct
     match ty.nullable, ty.v with
     | _, Ty_one_of _ ->
         Report.errorf ~loc "no concrete type %s was inferred" (ty_to_string ty)
-    | `non_null, Ty t -> sqlpp_backend ~loc (sprintf "decode_%s" (snd t))
-    | `null, Ty t -> sqlpp_backend ~loc (sprintf "decode_%s_NULL" (snd t))
+    | `non_null, Ty t -> sqlpp_types ~loc (sprintf "decode_%s" (snd t))
+    | `null, Ty t -> sqlpp_types ~loc (sprintf "decode_%s_NULL" (snd t))
 
   let gen_fold' (ret_ty : Analyze.row) init =
     let loc = dummy_loc in
@@ -454,7 +447,7 @@ end = struct
                 (List.map query.row ~f:(fun (n, ty) -> gent_ty ~loc:(fst n) ty))
           | Some t -> ptyp_constr ~loc t []
         in
-        let t = [%type: Sqlpp_db.Db.db -> [%t k_typ t]] in
+        let t = [%type: Sqlpp_db.db -> [%t k_typ t]] in
         gen_query_to_sql_ty query.params [%type: [%t t]]
       in
       [%expr ([%e e] : [%t t])]
@@ -494,7 +487,7 @@ end = struct
       in
       let t =
         gen_query_to_sql_ty query.params
-          [%type: Sqlpp_db.Db.db -> unit Sqlpp_db.IO.t]
+          [%type: Sqlpp_db.db -> unit Sqlpp_db.IO.t]
       in
       [%expr ([%e e] : [%t t])]
     with Sqlpp.Report.Error report ->

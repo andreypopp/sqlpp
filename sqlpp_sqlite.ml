@@ -1,37 +1,15 @@
 open Sqlpp
 
-module BlockingIO = struct
+module IO = struct
   type 'a t = 'a
 
   let ( >>= ) x f = f x
   let return x = x
 end
 
-module Sqlpp_db = Make (struct
-  module IO = BlockingIO
-
-  type db = Sqlite3.db
+module Sqlpp_types = struct
   type row = Sqlite3.Data.t array
-  type query = Sqlite3.stmt
-  type date = float
-  type datetime = float
 
-  let fold ~init ~f db sql =
-    try
-      let stmt = Sqlite3.prepare db sql in
-      let rec loop acc =
-        match Sqlite3.step stmt with
-        | ROW -> loop (f (Sqlite3.row_data stmt) acc)
-        | rc ->
-            Sqlite3.Rc.check rc;
-            acc
-      in
-      let acc = loop init in
-      Sqlite3.Rc.check (Sqlite3.finalize stmt);
-      acc
-    with Sqlite3.SqliteError err -> failwith (Sqlite3.errmsg db)
-
-  let exec = fold ~init:() ~f:(fun _row () -> ())
   let or_NULL f = function None -> "NULL" | Some v -> f v
   let encode_BOOL = function true -> "TRUE" | false -> "FALSE"
   let encode_BOOL_NULL = or_NULL encode_BOOL
@@ -73,7 +51,7 @@ module Sqlpp_db = Make (struct
   let decode_STRING : string decode =
    fun row idx -> match row.(idx) with TEXT s -> s | _ -> assert false
 
-  let decode_DATE : date decode =
+  let decode_DATE : float decode =
    fun row idx ->
     match row.(idx) with
     | TEXT s ->
@@ -95,7 +73,7 @@ module Sqlpp_db = Make (struct
         t
     | _ -> failwith "expected date"
 
-  let decode_DATETIME : datetime decode =
+  let decode_DATETIME : float decode =
    fun row idx ->
     match row.(idx) with
     | TEXT s ->
@@ -125,8 +103,36 @@ module Sqlpp_db = Make (struct
   let decode_STRING_NULL = or_NULL decode_STRING
   let decode_DATE_NULL = or_NULL decode_DATE
   let decode_DATETIME_NULL = or_NULL decode_DATETIME
+end
 
-  let decode row idx =
+module Db = struct
+  open Sqlpp_types
+  module IO = IO
+
+  type db = Sqlite3.db
+  type row = Sqlite3.Data.t array
+  type query = Sqlite3.stmt
+  type date = float
+  type datetime = float
+
+  let fold ~init ~f db sql =
+    try
+      let stmt = Sqlite3.prepare db sql in
+      let rec loop acc =
+        match Sqlite3.step stmt with
+        | ROW -> loop (f (Sqlite3.row_data stmt) acc)
+        | rc ->
+            Sqlite3.Rc.check rc;
+            acc
+      in
+      let acc = loop init in
+      Sqlite3.Rc.check (Sqlite3.finalize stmt);
+      acc
+    with Sqlite3.SqliteError err -> failwith (Sqlite3.errmsg db)
+
+  let exec = fold ~init:() ~f:(fun _row () -> ())
+
+  let row_to_json row idx =
     match row.(idx) with
     | Sqlite3.Data.NONE -> `Null
     | Sqlite3.Data.NULL -> `Null
@@ -159,11 +165,10 @@ module Sqlpp_db = Make (struct
       method! private emit_name ctx (_, name) =
         self#emit ctx (Printer.quote_ident name)
     end
-end)
+end
 
-module Ppx = Sqlpp_ppx.Make (struct
-  module Sqlpp_db = Sqlpp_db
-end)
+module Sqlpp_db = Make (Db)
+module Ppx = Sqlpp_ppx.Make (Db)
 
 let env = Ppx.env
 let () = Ppx.register ()

@@ -1,6 +1,6 @@
 open Sqlpp_sqlite
 
-type db = Sqlpp_db.Db.db
+type db = Sqlpp_db.db
 (** just an alias for the database type *)
 
 (** The [Todos] module provides an API for a todo list stored in a

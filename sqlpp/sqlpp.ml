@@ -216,8 +216,6 @@ module type DB = sig
   type db
   type row
   type query
-  type date
-  type datetime
 
   val fold : init:'a -> f:(row -> 'a -> 'a) -> db -> string -> 'a IO.t
   (** execute an SQL query that returns something and collapse the result *)
@@ -225,72 +223,33 @@ module type DB = sig
   val exec : db -> string -> unit IO.t
   (** execute an SQL query that returns nothing and collapse the result *)
 
-  (* encoding *)
-  type 'a encode := 'a -> string
-
-  val encode_BOOL : bool encode
-  val encode_BOOL_NULL : bool option encode
-  val encode_INT : int encode
-  val encode_INT_NULL : int option encode
-  val encode_FLOAT : float encode
-  val encode_FLOAT_NULL : float option encode
-  val encode_STRING : string encode
-  val encode_STRING_NULL : string option encode
-  val encode_DATE : date encode
-  val encode_DATE_NULL : date option encode
-  val encode_DATETIME : datetime encode
-  val encode_DATETIME_NULL : datetime option encode
-
-  (* decoding *)
-  type 'a decode := row -> int -> 'a
-
-  val decode : json decode
-  val decode_BOOL : bool decode
-  val decode_BOOL_NULL : bool option decode
-  val decode_INT : int decode
-  val decode_INT_NULL : int option decode
-  val decode_FLOAT : float decode
-  val decode_FLOAT_NULL : float option decode
-  val decode_STRING : string decode
-  val decode_STRING_NULL : string option decode
-  val decode_DATE : date decode
-  val decode_DATE_NULL : date option decode
-  val decode_DATETIME : datetime decode
-  val decode_DATETIME_NULL : datetime option decode
+  val row_to_json : row -> int -> json
 
   open Syntax
 
+  class virtual ['ctx] printer : ['ctx] Printer.printer
   (** printer for SQL queries *)
-  class virtual ['ctx] printer : object
-    method virtual emit : 'ctx Printer.ctx -> string -> unit
-
-    method virtual emit_Expr_match :
-      'ctx Printer.ctx -> name -> (name * name list * expr) list -> unit
-
-    method virtual emit_Expr_param : 'ctx Printer.ctx -> name -> unit
-    method emit_query : 'ctx Printer.ctx -> query pos -> unit
-    method emit_expr : 'ctx Printer.ctx -> expr -> unit
-  end
 end
 
 type params = string Syntax.NM.t
 
 module type BACKEND = sig
-  module Db : DB
   module IO : IO
 
+  type db
+  type row
   type stmt = { sql : string }
-  type ('f, 'a) query = { sql : string; decode : 'f -> Db.row -> 'a -> 'a }
+  type ('f, 'a) query = { sql : string; decode : 'f -> row -> 'a -> 'a }
 
-  val fold : init:'a -> f:'f -> Db.db -> ('f, 'a) query -> 'a IO.t
-  val exec : Db.db -> stmt -> unit IO.t
+  val fold : init:'a -> f:'f -> db -> ('f, 'a) query -> 'a IO.t
+  val exec : db -> stmt -> unit IO.t
 
   (** dynamic query API *)
   module Dynamic : sig
     val to_sql : ?params:params -> Env.t -> string -> string
     (** [to_sql schema q] returns the SQL query string for the given query [q] *)
 
-    val exec : ?params:params -> Env.t -> Db.db -> string -> json list IO.t
+    val exec : ?params:params -> Env.t -> db -> string -> json list IO.t
     (** [exec schema db q] executes the query [q] against the database [db] and
         returns the result as a list of JSON values *)
   end
@@ -300,9 +259,12 @@ module type BACKEND = sig
   end
 end
 
-module Make (Db : DB) : BACKEND with module Db = Db and module IO = Db.IO =
+module Make (Db : DB) :
+  BACKEND with type db = Db.db and type row = Db.row and module IO = Db.IO =
 struct
-  module Db = Db
+  type db = Db.db
+  type row = Db.row
+
   module IO = Db.IO
 
   type stmt = { sql : string }
@@ -373,7 +335,7 @@ struct
       Db.fold db sql ~init:[] ~f:(fun row acc ->
           let row =
             List.init len ~f:(fun idx ->
-                Array.get names idx, Db.decode row idx)
+                Array.get names idx, Db.row_to_json row idx)
           in
           `Assoc row :: acc)
       >>= fun res -> return (List.rev res)

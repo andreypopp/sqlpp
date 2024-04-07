@@ -45,37 +45,8 @@ module IO = struct
   let return v = Lwt.return (Ok v)
 end
 
-module Sqlpp_db = Make (struct
-  module IO = IO
-  open IO
-
-  type query = Mariadb_lwt.Stmt.t
+module Sqlpp_types = struct
   type row = Mariadb_lwt.Row.Array.t
-  type db = Mariadb_lwt.t
-  type 'a decode = row -> int -> 'a
-  type date = Mariadb_lwt.Time.t
-  type datetime = Mariadb_lwt.Time.t
-
-  let fold' ~init ~f ~handle_res db sql =
-    Mariadb_lwt.prepare db sql >>= fun stmt ->
-    Mariadb_lwt.Stmt.execute stmt Array.empty >>= fun res ->
-    handle_res res >>= fun res ->
-    Mariadb_lwt.Stmt.close stmt >>= fun () -> return res
-
-  let fold ~init ~f db sql =
-    let handle_res res =
-      let rec loop acc =
-        Mariadb_lwt.Res.fetch (module Mariadb_lwt.Row.Array) res >>= function
-        | None -> return acc
-        | Some row -> loop (f row acc)
-      in
-      loop init
-    in
-    fold' ~init ~f ~handle_res db sql
-
-  let exec db sql =
-    let handle_res _res = Lwt.return_ok () in
-    fold' ~init:() ~f:(Fun.const ()) ~handle_res db sql
 
   let or_NULL f = function None -> "NULL" | Some v -> f v
   let encode_BOOL = function true -> "TRUE" | false -> "FALSE"
@@ -101,6 +72,8 @@ module Sqlpp_db = Make (struct
       (Mariadb_lwt.Time.second v)
 
   let encode_DATETIME_NULL = or_NULL encode_DATETIME
+
+  type 'a decode = row -> int -> 'a
 
   let decode_BOOL : bool decode =
    fun row idx ->
@@ -134,8 +107,41 @@ module Sqlpp_db = Make (struct
   let decode_BOOL_NULL = or_NULL decode_BOOL
   let decode_DATE_NULL = or_NULL decode_DATE
   let decode_DATETIME_NULL = or_NULL decode_DATETIME
+end
 
-  let decode (row : row) idx : json =
+module Db = struct
+  open Sqlpp_types
+  module IO = IO
+  open IO
+
+  type query = Mariadb_lwt.Stmt.t
+  type row = Mariadb_lwt.Row.Array.t
+  type db = Mariadb_lwt.t
+  type date = Mariadb_lwt.Time.t
+  type datetime = Mariadb_lwt.Time.t
+
+  let fold' ~init ~f ~handle_res db sql =
+    Mariadb_lwt.prepare db sql >>= fun stmt ->
+    Mariadb_lwt.Stmt.execute stmt Array.empty >>= fun res ->
+    handle_res res >>= fun res ->
+    Mariadb_lwt.Stmt.close stmt >>= fun () -> return res
+
+  let fold ~init ~f db sql =
+    let handle_res res =
+      let rec loop acc =
+        Mariadb_lwt.Res.fetch (module Mariadb_lwt.Row.Array) res >>= function
+        | None -> return acc
+        | Some row -> loop (f row acc)
+      in
+      loop init
+    in
+    fold' ~init ~f ~handle_res db sql
+
+  let exec db sql =
+    let handle_res _res = Lwt.return_ok () in
+    fold' ~init:() ~f:(Fun.const ()) ~handle_res db sql
+
+  let row_to_json (row : row) idx : json =
     let field = row.(idx) in
     match Mariadb_lwt.Field.value field with
     | `Float f -> `Float f
@@ -155,11 +161,10 @@ module Sqlpp_db = Make (struct
       method! private emit_name ctx (_, name) =
         self#emit ctx (Printer.quote_ident_backticks name)
     end
-end)
+end
 
-module Ppx = Sqlpp_ppx.Make (struct
-  module Sqlpp_db = Sqlpp_db
-end)
+module Sqlpp_db = Make (Db)
+module Ppx = Sqlpp_ppx.Make (Db)
 
 let env = Ppx.env
 let () = Ppx.register ()

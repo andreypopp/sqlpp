@@ -15,4 +15,6 @@
  (libraries sqlpp sqlpp_sqlite sqlpp.manage))
 
 (cram
- (deps ./main.exe))
+ (alias test_sqlpp_sqlite)
+ (deps ./main.exe)
+ (runtest_alias false))
