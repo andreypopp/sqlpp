@@ -17,10 +17,4 @@
  (libraries ppxlib sqlpp.manage sqlpp_sqlite))
 
 (cram
- (applies_to * \ sqlpp_mariadb)
  (deps ./test_ppx ./test_ppx.exe ./test.exe ./schema.sql))
-
-(cram
- (alias test_sqlpp_mariadb)
- (runtest_alias false)
- (applies_to sqlpp_mariadb))
