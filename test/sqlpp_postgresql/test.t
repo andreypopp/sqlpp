@@ -1,8 +1,9 @@
 setup and run the test database:
 
+  $ export PATH="$(pg_config --bindir):$PATH"
   $ mkdir $PWD/db
   $ initdb -D $PWD/db >/dev/null 2>&1
-  $ postgres -D $PWD/db >/dev/null 2>&1 &
+  $ postgres -D $PWD/db -k /tmp/ >/dev/null 2>&1 &
 
 stop the database when the script exits:
 
@@ -16,12 +17,12 @@ wait till the database is ready:
 
 create the schema:
 
-  $ createdb sw
-  $ psql sw -q -f ./schema.sql
+  $ createdb sw --host /tmp
+  $ psql sw --host /tmp -q -f ./schema.sql
 
 finally, run the test suite:
 
-  $ ./main.exe
+  $ ./main.exe "postgresql:///sw?host=/tmp/"
   connecting to mariadb...
   inserting planets...
   listing planets...

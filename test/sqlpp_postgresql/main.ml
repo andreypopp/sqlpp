@@ -44,10 +44,11 @@ let test_planets =
   ]
 
 let () =
+  let uri = Sys.argv.(1) in
   assert_ok
   @@ Lwt_main.run
        (print_endline "connecting to mariadb...";
-        Postgresql_lwt.connect () ~uri:"postgresql:///sw" >>= fun conn ->
+        Postgresql_lwt.connect () ~uri >>= fun conn ->
         print_endline "inserting planets...";
         let rec insert_loop xs =
           match xs with
