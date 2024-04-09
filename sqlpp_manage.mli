@@ -103,6 +103,9 @@ module Make
       embed the commands within your own command line interface.
    *)
 
+    val db_t : Sqlpp_db.db Cmdliner.Term.t
+    (** A term which evaluates to a database connection. *)
+
     val commands : unit Cmdliner.Cmd.t list
     (** A set of commands, in case you want to use them in your own command line
       interface.

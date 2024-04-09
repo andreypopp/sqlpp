@@ -1,4 +1,5 @@
 
+  $ export DATABASE="sqlite::memory:"
   $ alias s='./test.exe sqlpp-sql --require ./schema.sql'
 
   $ s 'select id from users limit 1'

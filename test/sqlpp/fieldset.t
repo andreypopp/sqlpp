@@ -1,3 +1,4 @@
+  $ export DATABASE="sqlite::memory:"
   $ alias p='./test_ppx'
 
 it is possible to define a fieldset and then splice it into a query:

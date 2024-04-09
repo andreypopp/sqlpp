@@ -1,4 +1,5 @@
 
+  $ export DATABASE="sqlite::memory:"
   $ alias p='./test.exe sqlpp-analyze --require ./schema.sql'
   $ alias s='./test.exe sqlpp-sql --require ./schema.sql'
 

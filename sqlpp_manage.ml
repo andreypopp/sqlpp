@@ -15,9 +15,9 @@ end
 module Make
     (Sqlpp_db : BACKEND)
     (Sqlpp_types : TYPES with type row = Sqlpp_db.row)
-    (Migrate_db : MIGRATE
-                    with type 'a io = 'a Sqlpp_db.IO.t
-                     and type db = Sqlpp_db.db) =
+    (Sqlpp_migrate : MIGRATE
+                       with type 'a io = 'a Sqlpp_db.IO.t
+                        and type db = Sqlpp_db.db) =
 struct
   open Sqlpp_db.IO
 
@@ -95,7 +95,7 @@ struct
     let action_to_sql env = function
       | Define ddl ->
           Env.add_ddl env ddl;
-          Migrate_db.ddl_to_string env ddl
+          Sqlpp_migrate.ddl_to_string env ddl
       | Exec q -> sprintf "%s;" (Sqlpp_db.Dynamic.to_sql env q)
 
     let to_sql env { actions; name } =
@@ -109,21 +109,21 @@ struct
       Sqlpp_db.exec db { sql }
 
     let apply ~verbose db migrations =
-      Migrate_db.init db >>= fun () ->
+      Sqlpp_migrate.init db >>= fun () ->
       let env = Env.create () in
       iter_io migrations ~f:(fun m ->
-          Migrate_db.exists db m.name >>= fun applied ->
+          Sqlpp_migrate.exists db m.name >>= fun applied ->
           let sql = to_sql env m in
           if not applied then
-            exec ~verbose db sql >>= fun () -> Migrate_db.record db m.name
+            exec ~verbose db sql >>= fun () -> Sqlpp_migrate.record db m.name
           else return ())
 
     let is_ready db migrations =
-      Migrate_db.is_init db >>= function
+      Sqlpp_migrate.is_init db >>= function
       | false -> return false
       | true ->
           fold_io migrations ~init:true ~f:(fun acc m ->
-              Migrate_db.exists db m.name >>= fun applied ->
+              Sqlpp_migrate.exists db m.name >>= fun applied ->
               return (acc && applied))
 
     let apply ?(verbose = false) db = apply ~verbose db (all ())
@@ -149,13 +149,19 @@ struct
       let arg =
         Arg.(
           value
-          & opt string "sqlite::memory:"
+          & opt (some string) None
           & info [ "D"; "database" ] ~env ~doc:"database" ~docv:"DATABASE")
       in
       let f db =
-        Migrate_db.run_io @@ fun () ->
+        let db =
+          match db with
+          | None ->
+              failwith "missing database connection string, provide -D option"
+          | Some db -> db
+        in
+        Sqlpp_migrate.run_io @@ fun () ->
         Sqlpp_db.connect db >>= fun db ->
-        Migrate_db.init db >>= fun () -> return db
+        Sqlpp_migrate.init db >>= fun () -> return db
       in
       Term.(const f $ arg)
 
@@ -212,7 +218,7 @@ struct
 
     let migrate_cmd =
       let f verbose db =
-        Migrate_db.run_io @@ fun () -> Migrate.apply ~verbose db
+        Sqlpp_migrate.run_io @@ fun () -> Migrate.apply ~verbose db
       in
       let info =
         Cmd.info "migrate" ~docs
@@ -222,11 +228,11 @@ struct
 
     let migrate_ls_cmd =
       let f db =
-        Migrate_db.run_io @@ fun () ->
+        Sqlpp_migrate.run_io @@ fun () ->
         print_endline (sprintf "status\tname");
         Migrate.all ()
         |> iter_io ~f:(fun { Migrate.name; _ } ->
-               Migrate_db.exists db name >>= fun status ->
+               Sqlpp_migrate.exists db name >>= fun status ->
                print_endline (sprintf "%b\t%s" status name);
                return ())
       in
@@ -252,7 +258,7 @@ struct
 
     let query_cmd =
       let f db env params q =
-        Migrate_db.run_io @@ fun () ->
+        Sqlpp_migrate.run_io @@ fun () ->
         handle_error @@ fun () ->
         let sql = Sqlpp_db.Dynamic.to_sql ~params env q in
         print_endline sql;

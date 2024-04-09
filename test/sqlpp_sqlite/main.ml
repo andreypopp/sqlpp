@@ -143,27 +143,17 @@ end
 open Cmdliner
 
 let db_t =
-  let env = Cmd.Env.info "DATABASE" in
-  let arg =
-    Arg.(
-      value
-      & opt string "sqlite::memory:"
-      & info [ "D"; "database" ] ~env ~doc:"database" ~docv:"DATABASE")
-  in
-  let f db_path =
-    let db = Sqlpp_db.connect db_path in
+  let f db =
     if not (Sqlpp_sqlite_manage.Migrate.is_ready db) then (
       let msg =
         Printf.sprintf
-          "ERROR: pending migrations found, run\n\n\
-          \  %s migrate -D %S\n\n\
-           to apply them" Sys.argv.(0) db_path
+          "ERROR: pending migrations found, run %s migrate to apply them" Sys.argv.(0)
       in
       prerr_endline msg;
       exit 1);
     db
   in
-  Term.(const f $ arg)
+  Term.(const f $ Sqlpp_sqlite_manage.Command_line_interface.db_t)
 
 let text_t = Arg.(required & pos 0 (some string) None & info [])
 let id_t = Arg.(required & pos 0 (some int) None & info [])
