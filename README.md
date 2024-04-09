@@ -21,10 +21,11 @@ extension to sql. it's not a new language.
 project structure:
 - `sqlpp` implements sqlpp language parser, analyzer and generic SQL printer
 - `sqlpp_ppx` implements typed embedding into ocaml as ppx
+- `sqlpp_manage` database management interface
 - `sqlpp_sqlite` Sqlite dialect/driver
+- `sqlpp_sqlite_manage` database management interface for Sqlite
 - `sqlpp_mariadb` MariaDB dialect/driver, uses lwt for I/O
 - `sqlpp_postgresql` PostgreSQL dialect/driver, uses lwt for I/O
-- `sqlpp_manage` database management (sqlite only for now)
 
 example project structure:
 - `test/sqlpp_sqlite/db.ml` defines the database schema, also acts as a ppx

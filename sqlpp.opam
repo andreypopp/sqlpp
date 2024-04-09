@@ -9,6 +9,7 @@ bug-reports: "https://github.com/andreypopp/sqlpp/issues"
 depends: [
   "ocaml" {>= "4.14"}
   "dune" {>= "3.14"}
+  "uri"
   "yojson"
   "menhir"
   "menhirLib"

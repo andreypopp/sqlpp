@@ -48,7 +48,7 @@ let () =
   assert_ok
   @@ Lwt_main.run
        (print_endline "connecting to mariadb...";
-        Postgresql_lwt.connect () ~uri >>= fun conn ->
+        Sqlpp_db.connect uri >>= fun conn ->
         print_endline "inserting planets...";
         let rec insert_loop xs =
           match xs with

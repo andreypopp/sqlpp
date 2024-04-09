@@ -147,13 +147,12 @@ let db_t =
   let arg =
     Arg.(
       value
-      & opt (some string) None
+      & opt string "sqlite::memory:"
       & info [ "D"; "database" ] ~env ~doc:"database" ~docv:"DATABASE")
   in
   let f db_path =
-    let db_path = Option.value db_path ~default:":memory:" in
-    let db = Sqlite3.db_open db_path in
-    if not (Sqlpp_manage.Migrate.is_ready db) then (
+    let db = Sqlpp_db.connect db_path in
+    if not (Sqlpp_sqlite_manage.Migrate.is_ready db) then (
       let msg =
         Printf.sprintf
           "ERROR: pending migrations found, run\n\n\
@@ -236,14 +235,14 @@ let commands =
     todos_show_cmd;
     todos_project_stats_cmd;
   ]
-  @ Sqlpp_manage.Command_line_interface.commands
+  @ Sqlpp_sqlite_manage.Command_line_interface.commands
 
 let main_cmd =
   let info =
     Cmd.info
       ~man:
         ([ `S Manpage.s_commands ]
-        @ Sqlpp_manage.Command_line_interface.s_sections)
+        @ Sqlpp_sqlite_manage.Command_line_interface.s_sections)
       "example" ~version:"%%VERSION%%"
   in
   Cmd.group info commands

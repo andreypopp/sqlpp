@@ -1,6 +1,6 @@
 open Sqlpp.Syntax
-open Sqlpp_manage
-module M = Migrate
+
+module M = Sqlpp_sqlite_manage.Migrate
 
 let default_project_id = "default"
 
@@ -65,4 +65,4 @@ let () =
         ~default:"datetime('1970-01-01T00:00:00')" ~update:(fun prev ->
           Printf.sprintf "coalesce(datetime(%s), now())" prev))
 
-let () = Sqlpp_manage.setup_env Sqlpp_sqlite.env
+let () = Sqlpp_sqlite_manage.setup_env Sqlpp_sqlite.env

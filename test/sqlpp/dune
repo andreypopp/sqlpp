@@ -14,7 +14,7 @@
   (pps ppx_blob))
  (preprocessor_deps
   (file schema.sql))
- (libraries ppxlib sqlpp.manage sqlpp_sqlite))
+ (libraries ppxlib sqlpp.manage sqlpp_sqlite sqlpp_sqlite.manage))
 
 (cram
  (deps ./test_ppx ./test_ppx.exe ./test.exe ./schema.sql))

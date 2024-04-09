@@ -9,7 +9,7 @@ build fmt clean watch:
 
 .PHONY: test test_core test_mariadb test_sqlite
 test:
-	dune build @runtest @test_sqlpp_mariadb @test_sqlpp_sqlite
+	dune build @runtest @test_sqlpp_mariadb @test_sqlpp_sqlite @test_sqlpp_postgresql
 test_core:
 	dune runtest
 test_sqlite:

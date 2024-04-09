@@ -1,11 +1,5 @@
 open Sqlpp
 
-(** Postgresql on Lwt *)
-module Postgresql_lwt : sig
-  val connect :
-    uri:string -> unit -> (Postgresql.connection, string) result Lwt.t
-end
-
 (** A single row in a result set. 
 
     Note that values of this type are mutable and not meant to be stored

@@ -33,9 +33,16 @@
  (public_name sqlpp.manage)
  (modules sqlpp_manage)
  (flags -open Sqlpp_std)
+ (libraries cmdliner sqlpp sqlpp.std))
+
+(library
+ (name sqlpp_sqlite_manage)
+ (public_name sqlpp_sqlite.manage)
+ (modules sqlpp_sqlite_manage)
+ (flags -open Sqlpp_std)
+ (libraries cmdliner sqlpp sqlpp.std sqlpp_sqlite sqlpp.manage)
  (preprocess
-  (pps sqlpp_sqlite))
- (libraries cmdliner sqlpp sqlpp.std sqlpp_sqlite sqlite3))
+  (pps sqlpp_sqlite)))
 
 (library
  (name sqlpp_ppx)

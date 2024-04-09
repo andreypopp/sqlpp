@@ -5,6 +5,7 @@
  (preprocess
   (pps ppx_hash ppx_compare sedlex.ppx))
  (libraries
+  uri
   re
   yojson
   menhirLib

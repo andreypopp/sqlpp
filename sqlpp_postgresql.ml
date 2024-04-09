@@ -105,6 +105,12 @@ module Db = struct
   type nonrec row = row
   type db = Postgresql.connection
 
+  let connect (uri : Uri.t) =
+    (match Uri.scheme uri with
+    | Some "postgresql" -> ()
+    | _ -> failwith "unsupported scheme: expected postgresql://...");
+    Postgresql_lwt.connect ~uri:(Uri.to_string uri) ()
+
   let rec wait_for_result (db : db) =
     let rec do_wait () =
       db#consume_input;

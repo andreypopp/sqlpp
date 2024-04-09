@@ -256,13 +256,17 @@ module type DB = sig
   type row
   type query
 
+  val connect : Uri.t -> db IO.t
+  (** connect to a database *)
+
   val fold : init:'a -> f:(row -> 'a -> 'a) -> db -> string -> 'a IO.t
-  (** execute an SQL query that returns something and collapse the result *)
+  (** execute an SQL query that returns something and fold over the result *)
 
   val exec : db -> string -> unit IO.t
-  (** execute an SQL query that returns nothing and collapse the result *)
+  (** execute an SQL query that returns nothing *)
 
   val row_to_json : row -> int -> json
+  (** decode a column value to a JSON value *)
 
   open Syntax
 
@@ -280,6 +284,7 @@ module type BACKEND = sig
   type stmt = { sql : string }
   type ('f, 'a) query = { sql : string; decode : 'f -> row -> 'a -> 'a }
 
+  val connect : string -> db IO.t
   val fold : init:'a -> f:'f -> db -> ('f, 'a) query -> 'a IO.t
   val exec : db -> stmt -> unit IO.t
 
@@ -308,6 +313,10 @@ struct
 
   type stmt = { sql : string }
   type ('f, 'a) query = { sql : string; decode : 'f -> Db.row -> 'a -> 'a }
+
+  let connect uri =
+    let uri = Uri.of_string uri in
+    Db.connect uri
 
   let fold ~init ~f db q = Db.fold ~init ~f:(q.decode f) db q.sql
   let exec db (q : stmt) = Db.exec db q.sql

@@ -1,4 +1,4 @@
-  $ export DATABASE=./test.db
+  $ export DATABASE="sqlite:test.db"
   $ alias sanitize='sed -E "s/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/DATETIME/g"'
 
   $ ./main.exe migrate --verbose

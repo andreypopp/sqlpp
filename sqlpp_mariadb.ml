@@ -117,8 +117,18 @@ module Db = struct
   type query = Mariadb_lwt.Stmt.t
   type row = Mariadb_lwt.Row.Array.t
   type db = Mariadb_lwt.t
-  type date = Mariadb_lwt.Time.t
-  type datetime = Mariadb_lwt.Time.t
+
+  let connect (uri : Uri.t) =
+    (match Uri.scheme uri with
+    | Some "mariadb" -> ()
+    | _ -> failwith "unsupported scheme: expected mariadb://...");
+    let host = Uri.host uri in
+    let user = Uri.user uri in
+    let pass = Uri.password uri in
+    let port = Uri.port uri in
+    let socket = Uri.path uri |> function "" -> None | path -> Some path in
+    let db = Uri.get_query_param uri "db" in
+    Mariadb_lwt.connect ?host ?user ?pass ?db ?port ?socket ()
 
   let fold' ~init ~f ~handle_res db sql =
     Mariadb_lwt.prepare db sql >>= fun stmt ->

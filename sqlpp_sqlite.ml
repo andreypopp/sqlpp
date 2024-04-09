@@ -115,6 +115,33 @@ module Db = struct
   type date = float
   type datetime = float
 
+  let connect (uri : Uri.t) =
+    let disallow what = function
+      | None -> ()
+      | Some _ ->
+          failwith (sprintf "sqlite:// database cannot have %s specified" what)
+    in
+    (match Uri.scheme uri with
+    | Some "sqlite" -> ()
+    | Some scheme ->
+        failwith
+          (sprintf "unsupported scheme %S, expected sqlite://..." scheme)
+    | None -> failwith "missing scheme, expected sqlite://");
+    disallow "user" (Uri.user uri);
+    disallow "password" (Uri.password uri);
+    disallow "host" (Uri.host uri);
+    disallow "port" (Uri.port uri);
+    let mode =
+      match Uri.get_query_param uri "mode" with
+      | Some "readonly" -> Some `READONLY
+      | Some "no_create" -> Some `NO_CREATE
+      | None -> None
+      | Some _ ->
+          failwith "invalid value for mode: expected 'readonly' or 'no_create'"
+    in
+    let path = Uri.path uri in
+    Sqlite3.db_open ?mode path
+
   let fold ~init ~f db sql =
     try
       let stmt = Sqlite3.prepare db sql in
@@ -130,7 +157,7 @@ module Db = struct
       acc
     with Sqlite3.SqliteError err -> failwith (Sqlite3.errmsg db)
 
-  let exec = fold ~init:() ~f:(fun _row () -> ())
+  let exec db sql = Sqlite3.Rc.check (Sqlite3.exec db sql)
 
   let row_to_json row idx =
     match row.(idx) with
