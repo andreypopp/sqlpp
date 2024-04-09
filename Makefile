@@ -12,10 +12,12 @@ test:
 	dune build @runtest @test_sqlpp_mariadb @test_sqlpp_sqlite
 test_core:
 	dune runtest
-test_mariadb:
-	dune build @test_sqlpp_mariadb
 test_sqlite:
 	dune build @test_sqlpp_sqlite
+test_mariadb:
+	dune build @test_sqlpp_mariadb
+test_postgresql:
+	dune build @test_sqlpp_postgresql
 
 .PHONY: b
 b: build

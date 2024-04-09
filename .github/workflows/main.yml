@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: install apt packages
-        run: sudo apt-get install -y mariadb-server
+        run: sudo apt-get install -y mariadb-server postgresql
 
       - name: set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2

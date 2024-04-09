@@ -21,6 +21,14 @@
  (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx lwt lwt.unix mariadb))
 
 (library
+ (name sqlpp_postgresql)
+ (public_name sqlpp_postgresql)
+ (modules sqlpp_postgresql)
+ (kind ppx_rewriter)
+ (flags -open Sqlpp_std)
+ (libraries unix pprint sqlpp sqlpp.std sqlpp.ppx lwt lwt.unix postgresql))
+
+(library
  (name sqlpp_manage)
  (public_name sqlpp.manage)
  (modules sqlpp_manage)

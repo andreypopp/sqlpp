@@ -34,3 +34,8 @@
  (name sqlpp_mariadb)
  (synopsis "MariaDB/Lwt backend for sqlpp.")
  (depends (ocaml (>= 4.14)) dune sqlpp pprint mariadb lwt))
+
+(package
+ (name sqlpp_postgresql)
+ (synopsis "PostgreSQL/Lwt backend for sqlpp.")
+ (depends (ocaml (>= 4.14)) dune sqlpp pprint postgresql lwt))

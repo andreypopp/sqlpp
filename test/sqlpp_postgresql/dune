@@ -1,0 +1,10 @@
+(executable
+ (name main)
+ (modules main)
+ (preprocess (pps sqlpp_postgresql))
+ (libraries cmdliner sqlpp sqlpp_postgresql lwt))
+
+(cram
+ (alias test_sqlpp_postgresql)
+ (deps ./schema.sql ./main.exe)
+ (runtest_alias false))
