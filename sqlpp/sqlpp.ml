@@ -203,6 +203,45 @@ let () =
 
 type json = Yojson.Basic.t
 
+(** define some sensible minimal api for encoding/decoding of database values
+
+    database dialects can define additional types as they wish *)
+module type TYPES = sig
+  type row
+  (** database row *)
+
+  type 'a encode := 'a -> string
+  type 'a decode := row -> int -> 'a
+
+  (** BOOL *)
+
+  val encode_BOOL : bool encode
+  val decode_BOOL : bool decode
+  val encode_BOOL_NULL : bool option encode
+  val decode_BOOL_NULL : bool option decode
+
+  (** INT *)
+
+  val encode_INT : int encode
+  val decode_INT : int decode
+  val encode_INT_NULL : int option encode
+  val decode_INT_NULL : int option decode
+
+  (** FLOAT *)
+
+  val encode_FLOAT : float encode
+  val decode_FLOAT : float decode
+  val encode_FLOAT_NULL : float option encode
+  val decode_FLOAT_NULL : float option decode
+
+  (** STRING *)
+
+  val encode_STRING : string encode
+  val encode_STRING_NULL : string option encode
+  val decode_STRING : string decode
+  val decode_STRING_NULL : string option decode
+end
+
 module type IO = sig
   type 'a t
 

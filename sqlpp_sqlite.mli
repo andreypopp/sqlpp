@@ -12,33 +12,23 @@ module Sqlpp_db :
 
 (** Database types encoders/decoders. *)
 module Sqlpp_types : sig
-  type row = Sqlpp_db.row
+  include TYPES with type row = Sqlpp_db.row
+
   type 'a encode := 'a -> string
   type 'a decode := row -> int -> 'a
 
-  val encode_BOOL : bool encode
-  val encode_BOOL_NULL : bool option encode
-  val encode_INT : int encode
-  val encode_FLOAT : float encode
-  val encode_STRING : string encode
+  (** DATE *)
+
   val encode_DATE : float encode
-  val encode_DATETIME : float encode
-  val encode_INT_NULL : int option encode
-  val encode_FLOAT_NULL : float option encode
-  val encode_STRING_NULL : string option encode
-  val encode_DATE_NULL : float option encode
-  val encode_DATETIME_NULL : float option encode
-  val decode_BOOL : bool decode
-  val decode_INT : int decode
-  val decode_FLOAT : float decode
-  val decode_STRING : string decode
   val decode_DATE : float decode
-  val decode_DATETIME : float decode
-  val decode_BOOL_NULL : bool option decode
-  val decode_INT_NULL : int option decode
-  val decode_FLOAT_NULL : float option decode
-  val decode_STRING_NULL : string option decode
+  val encode_DATE_NULL : float option encode
   val decode_DATE_NULL : float option decode
+
+  (** DATETIME *)
+
+  val encode_DATETIME : float encode
+  val decode_DATETIME : float decode
+  val encode_DATETIME_NULL : float option encode
   val decode_DATETIME_NULL : float option decode
 end
 
