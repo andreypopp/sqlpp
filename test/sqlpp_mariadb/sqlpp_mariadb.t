@@ -1,23 +1,24 @@
 setup and run the test database:
 
   $ mkdir ./db
-  $ mariadb-install-db \
-  > --datadir=./db \
+  $ mysql_install_db \
+  > --datadir=$PWD/db \
   > --skip-networking \
   > --user root \
   > --skip-test-db \
-  > >/dev/null
-  $ mariadbd \
+  > >/dev/null 2>&1 
+  $ mysqld \
   > --console \
   > --skip-networking \
   > --socket=/tmp/mariadb.socket \
+  > --pid-file=/tmp/mariadb.pid \
   > --datadir=$PWD/db \
-  > 2>/dev/null &
+  > >/dev/null 2>&1 &
 
 stop the database when the script exits:
 
   $ DB_PID="$!"
-  $ function on_done() { kill -9 $DB_PID; }
+  $ on_done() { kill -9 $DB_PID; }
   $ trap on_done EXIT
 
 wait till the database is ready:
@@ -26,7 +27,7 @@ wait till the database is ready:
 
 create the schema:
 
-  $ mysql --socket=/tmp/mariadb.socket < schema.sql
+  $ cat schema.sql | mysql --socket=/tmp/mariadb.socket -B
 
 finally, run the test suite:
 
