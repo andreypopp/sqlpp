@@ -18,7 +18,7 @@ setup and run the test database:
 stop the database when the script exits:
 
   $ DB_PID="$!"
-  $ on_done() { kill -9 $DB_PID; }
+  $ on_done() { kill $DB_PID; }
   $ trap on_done EXIT
 
 wait till the database is ready:
