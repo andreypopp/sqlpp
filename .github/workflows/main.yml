@@ -43,3 +43,4 @@ jobs:
       - run: opam exec -- dune runtest
       - run: opam exec -- dune build @test_sqlpp_sqlite
       - run: opam exec -- dune build @test_sqlpp_mariadb
+      - run: opam exec -- dune build @test_sqlpp_postgresql
