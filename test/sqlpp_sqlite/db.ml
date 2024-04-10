@@ -1,5 +1,4 @@
 open Sqlpp.Syntax
-
 module M = Sqlpp_sqlite_manage.Migrate
 
 let default_project_id = "default"

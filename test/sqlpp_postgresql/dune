@@ -1,7 +1,8 @@
 (executable
  (name main)
  (modules main)
- (preprocess (pps sqlpp_postgresql))
+ (preprocess
+  (pps sqlpp_postgresql))
  (libraries cmdliner sqlpp sqlpp_postgresql lwt))
 
 (cram

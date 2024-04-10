@@ -147,7 +147,8 @@ let db_t =
     if not (Sqlpp_sqlite_manage.Migrate.is_ready db) then (
       let msg =
         Printf.sprintf
-          "ERROR: pending migrations found, run %s migrate to apply them" Sys.argv.(0)
+          "ERROR: pending migrations found, run %s migrate to apply them"
+          Sys.argv.(0)
       in
       prerr_endline msg;
       exit 1);
