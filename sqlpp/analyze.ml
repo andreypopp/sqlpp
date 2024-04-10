@@ -269,70 +269,65 @@ let mark_field_as_used ctx scope n f =
   if ctx.is_used then mark_field_as_used scope f
 
 module Check_agg = struct
-  type ctx = { group_by : expr list option; scope : Scope.scope }
-
   let is_agg_expr_app name _args =
     match snd name with "count" | "sum" | "max" | "min" -> true | _ -> false
 
   let fold =
     object (self)
-      inherit [unit, ctx] Syntax.fold as super
+      inherit [unit, Scope.scope] Syntax.fold as super
+      method! fold_select scope select () = super#fold_select scope select ()
 
-      method! fold_select ctx select () =
-        let group_by = select.node.select_group_by in
-        super#fold_select { ctx with group_by } select ()
+      method! fold_select_proj scope fields () =
+        super#fold_select_proj scope fields ();
+        NT.iter (fun _ f -> self#fold_expr scope f.expr ()) scope.fields
 
-      method! fold_select_proj ctx fields () =
-        super#fold_select_proj ctx fields ();
-        NT.iter (fun _ f -> self#fold_expr ctx f.expr ()) ctx.scope.fields
-
-      method! fold_From_select ctx select alias () =
+      method! fold_From_select scope select alias () =
         let scope =
-          match Scope.scope_subscope ctx.scope alias with
+          match Scope.scope_subscope scope alias with
           | Some scope -> scope
           | None -> failwithf "Check_agg.fold_From_select: no such scope"
         in
-        super#fold_From_select { ctx with scope } select alias ()
+        super#fold_From_select scope select alias ()
 
-      method! fold_expr ctx expr () =
-        match ctx.group_by with
+      method! fold_expr scope expr () =
+        match scope.group_by with
         | Some group_by when List.exists group_by ~f:(equal_expr expr) -> ()
-        | _ -> super#fold_expr ctx expr ()
+        | _ -> super#fold_expr scope expr ()
 
-      method! fold_Expr_exists ctx select () =
+      method! fold_Expr_exists scope select () =
         (* NOTE: safe to stop check here as the query within should be checked
            already *)
         ()
 
-      method! fold_Expr_in ctx es select () =
+      method! fold_Expr_in scope es select () =
         (* NOTE: safe to not check [select] here as the query within should be
            checked already *)
-        List.fold_left es ~init:() ~f:(fun () x -> self#fold_expr ctx x ())
+        List.fold_left es ~init:() ~f:(fun () x -> self#fold_expr scope x ())
 
-      method! fold_Expr_app ctx name args () =
-        let ctx =
-          match Option.is_some ctx.group_by, is_agg_expr_app name args with
+      method! fold_Expr_app scope name args () =
+        let scope =
+          match Option.is_some scope.group_by, is_agg_expr_app name args with
           | false, true ->
               Report.errorf ~loc:(fst name)
                 "aggregate function `%s(..)` is not allowed without GROUP BY"
                 (snd name)
-          | true, true -> { ctx with group_by = None }
-          | _, false -> ctx
+          | true, true -> { scope with group_by = None }
+          | _, false -> scope
         in
-        super#fold_Expr_app ctx name args ()
+        super#fold_Expr_app scope name args ()
 
-      method! fold_Expr_nav ctx name expr () =
+      method! fold_Expr_nav scope name expr () =
         match expr.node with
         | Expr_name _ ->
-            if Option.is_some ctx.group_by then
+            if Option.is_some scope.group_by then
               Report.errorf ~loc:expr.loc
                 "expression `%s` is not in GROUP BY clause and is not under \
                  aggregate function"
                 (expr_to_string (expr_nav name expr))
-        | _ -> super#fold_Expr_nav ctx name expr ()
+        | _ -> super#fold_Expr_nav scope name expr ()
     end
 
-  let run scope f x = f { group_by = None; scope } x ()
+  let run scope f x = f scope x ()
 end
 
 let is_valid_date =
@@ -663,6 +658,7 @@ and infer_select ~ctx (select : select) : Scope.scope * select =
            snd (infer_expr ~ctx:(Expr_ctx.make ~is_used:true scope ctx) e)))
       select_group_by
   in
+  let scope = { scope with Scope.group_by = select_group_by } in
   let select_having =
     Option.map
       (fun e ->

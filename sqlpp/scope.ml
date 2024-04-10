@@ -1,6 +1,12 @@
 open Syntax
 
-type scope = { scopes : scopes; fields : fields; is_open : bool }
+type scope = {
+  scopes : scopes;
+  fields : fields;
+  is_open : bool;
+  group_by : expr list option;
+}
+
 and scopes = (name * scope_elem) list
 and fields = field NT.t
 and scope_elem = S of scope nullable | A of name list
@@ -49,16 +55,22 @@ let scope_subscope scope name =
   in
   aux name scope.scopes
 
-let scope_create ?(is_open = false) ?fields:fields' ?(scopes = []) () =
+let scope_create ?group_by ?(is_open = false) ?fields:fields' ?(scopes = []) ()
+    =
   let fields = NT.create 10 in
   Option.iter (List.iter ~f:(fun f -> NT.replace fields f.name f)) fields';
-  { scopes; fields; is_open }
+  { scopes; fields; is_open; group_by }
 
 let scope_fields scope = NT.to_seq_values scope.fields
 
 let fresh =
-  let rec copy_scope { scopes; fields; is_open } =
-    { scopes = copy_scopes scopes; fields = copy_fields fields; is_open }
+  let rec copy_scope { scopes; fields; is_open; group_by } =
+    {
+      scopes = copy_scopes scopes;
+      fields = copy_fields fields;
+      is_open;
+      group_by;
+    }
   and copy_scopes s = List.map ~f:(fun (n, v) -> n, copy_scopeb v) s
   and copy_scopeb = function
     | S s -> S { s with v = copy_scope s.v }
