@@ -5,7 +5,15 @@ let () =
     | Postgresql.Error err -> Some (Postgresql.string_of_error err)
     | _ -> None)
 
-module Row = struct
+module Row : sig
+  type t
+
+  val create : unit -> t
+  val set : t -> Postgresql.result -> int -> unit
+  val isnull : t -> int -> bool
+  val value : t -> int -> string
+  val ftype : t -> int -> Postgresql.ftype
+end = struct
   type t = {
     mutable isnull : int -> bool;
     mutable tuple : string array;
@@ -25,18 +33,22 @@ module Row = struct
     row.ftype <- res#ftype
 
   let isnull row idx = row.isnull idx
-  let get row idx = row.tuple.(idx)
+  let value row idx = row.tuple.(idx)
   let ftype row idx = row.ftype idx
 end
 
 module Sqlpp_types = struct
-  type nonrec row = Row.t
+  type row = Row.t
+  type 'a encode = 'a -> string
 
-  let or_NULL f = function None -> "NULL" | Some v -> f v
   let encode_BOOL = function true -> "TRUE" | false -> "FALSE"
   let encode_STRING = Printer.quote_string
   let encode_INT v = string_of_int v
   let encode_FLOAT v = string_of_float v
+
+  let or_NULL : 'a encode -> 'a option encode =
+   fun f -> function None -> "NULL" | Some v -> f v
+
   let encode_BOOL_NULL = or_NULL encode_BOOL
   let encode_INT_NULL = or_NULL encode_INT
   let encode_FLOAT_NULL = or_NULL encode_FLOAT
@@ -44,17 +56,18 @@ module Sqlpp_types = struct
 
   type 'a decode = row -> int -> 'a
 
-  let or_NULL : 'a decode -> 'a option decode =
-   fun f row idx -> if row.isnull idx then None else Some (f row idx)
+  let map_value : (string -> 'a) -> 'a decode =
+   fun f row idx -> f (Row.value row idx)
 
-  let decode_BOOL : bool decode = fun row idx -> bool_of_string row.tuple.(idx)
-  let decode_INT : int decode = fun row idx -> int_of_string row.tuple.(idx)
-
-  let decode_FLOAT : float decode =
-   fun row idx -> float_of_string row.tuple.(idx)
-
-  let decode_STRING : string decode = fun row idx -> row.tuple.(idx)
+  let decode_BOOL : bool decode = map_value bool_of_string
+  let decode_INT : int decode = map_value int_of_string
+  let decode_FLOAT : float decode = map_value float_of_string
+  let decode_STRING : string decode = Row.value
   let encode_STRING = Printer.quote_string
+
+  let or_NULL : 'a decode -> 'a option decode =
+   fun f row idx -> if Row.isnull row idx then None else Some (f row idx)
+
   let decode_INT_NULL = or_NULL decode_INT
   let decode_FLOAT_NULL = or_NULL decode_FLOAT
   let decode_STRING_NULL = or_NULL decode_STRING
@@ -101,8 +114,7 @@ module Db = struct
   open Lwt.Infix
   module IO = IO
 
-  type query = unit
-  type nonrec row = row
+  type row = Row.t
   type db = Postgresql.connection
 
   let connect (uri : Uri.t) =
@@ -176,10 +188,10 @@ module Db = struct
     in
     fold' ~init:() ~f:(Fun.const ()) ~handle_res db sql
 
-  let row_to_json (row : row) idx : json =
-    if row.isnull idx then `Null
+  let decode_json (row : row) idx : json =
+    if Row.isnull row idx then `Null
     else
-      match row.ftype idx with
+      match Row.ftype row idx with
       | BOOL -> `Bool (decode_BOOL row idx)
       | INT8 | INT2 | INT4 -> `Int (decode_INT row idx)
       | FLOAT4 | FLOAT8 -> `Float (decode_FLOAT row idx)

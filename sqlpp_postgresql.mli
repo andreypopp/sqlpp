@@ -9,7 +9,7 @@ module Row : sig
   type t
 
   val isnull : t -> int -> bool
-  val get : t -> int -> string
+  val value : t -> int -> string
   val ftype : t -> int -> Postgresql.ftype
 end
 

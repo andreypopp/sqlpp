@@ -111,9 +111,6 @@ module Db = struct
 
   type db = Sqlite3.db
   type row = Sqlite3.Data.t array
-  type query = Sqlite3.stmt
-  type date = float
-  type datetime = float
 
   let connect (uri : Uri.t) =
     let disallow what = function
@@ -159,7 +156,7 @@ module Db = struct
 
   let exec db sql = Sqlite3.Rc.check (Sqlite3.exec db sql)
 
-  let row_to_json row idx =
+  let decode_json row idx =
     match row.(idx) with
     | Sqlite3.Data.NONE -> `Null
     | Sqlite3.Data.NULL -> `Null

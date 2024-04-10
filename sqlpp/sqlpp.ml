@@ -253,8 +253,10 @@ module type DB = sig
   module IO : IO
 
   type db
+  (** represents a database handle/connection *)
+
   type row
-  type query
+  (** represents a database row *)
 
   val connect : Uri.t -> db IO.t
   (** connect to a database *)
@@ -265,10 +267,8 @@ module type DB = sig
   val exec : db -> string -> unit IO.t
   (** execute an SQL query that returns nothing *)
 
-  val row_to_json : row -> int -> json
+  val decode_json : row -> int -> json
   (** decode a column value to a JSON value *)
-
-  open Syntax
 
   class virtual ['ctx] printer : ['ctx] Printer.printer
   (** printer for SQL queries *)
@@ -280,13 +280,25 @@ module type BACKEND = sig
   module IO : IO
 
   type db
+  (** represents a database handle/connection *)
+
   type row
-  type stmt = { sql : string }
-  type ('f, 'a) query = { sql : string; decode : 'f -> row -> 'a -> 'a }
+  (** represents a database row *)
 
   val connect : string -> db IO.t
+  (** connect to a database *)
+
+  type ('f, 'a) query = { sql : string; decode : 'f -> row -> 'a -> 'a }
+  (** represents a query with a folder *)
+
   val fold : init:'a -> f:'f -> db -> ('f, 'a) query -> 'a IO.t
+  (** execute a query and fold over the result *)
+
+  type stmt = { sql : string }
+  (** represents a statement *)
+
   val exec : db -> stmt -> unit IO.t
+  (** execute a statement *)
 
   (** dynamic query API *)
   module Dynamic : sig
@@ -383,7 +395,7 @@ struct
       Db.fold db sql ~init:[] ~f:(fun row acc ->
           let row =
             List.init len ~f:(fun idx ->
-                Array.get names idx, Db.row_to_json row idx)
+                Array.get names idx, Db.decode_json row idx)
           in
           `Assoc row :: acc)
       >>= fun res -> return (List.rev res)

@@ -114,7 +114,6 @@ module Db = struct
   module IO = IO
   open IO
 
-  type query = Mariadb_lwt.Stmt.t
   type row = Mariadb_lwt.Row.Array.t
   type db = Mariadb_lwt.t
 
@@ -151,7 +150,7 @@ module Db = struct
     let handle_res _res = Lwt.return_ok () in
     fold' ~init:() ~f:(Fun.const ()) ~handle_res db sql
 
-  let row_to_json (row : row) idx : json =
+  let decode_json (row : row) idx : json =
     let field = row.(idx) in
     match Mariadb_lwt.Field.value field with
     | `Float f -> `Float f
