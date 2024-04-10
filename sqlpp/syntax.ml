@@ -222,6 +222,7 @@ and exprsyn =
   | Expr_name of name
   | Expr_nav of name * expr
   | Expr_in of expr list * select
+  | Expr_exists of select
   | Expr_ascribe of expr * ty_or_expr
   | Expr_param of name
   | Expr_match of name * expr_match_case list
@@ -356,6 +357,7 @@ let expr_app ?loc f es = expr ?loc (Expr_app (f, es))
 let expr_lit ?loc lit = expr ?loc (Expr_lit lit)
 let expr_name ?loc n = expr ?loc (Expr_name n)
 let expr_in ?loc es select = expr ?loc (Expr_in (es, select))
+let expr_exists ?loc select = expr ?loc (Expr_exists select)
 let expr_ascribe ?loc e ty = expr ?loc (Expr_ascribe (e, ty))
 let expr_param ?loc name = expr ?loc (Expr_param name)
 let expr_match ?loc n vs = expr ?loc (Expr_match (n, vs))
@@ -422,6 +424,9 @@ class ['ctx] format =
                (List.map es ~f:(self#format_expr None ctx)))
           ^^> string "IN"
           ^^> parens (self#format_select ctx select)
+      | Expr_exists select ->
+          group
+            (string "EXISTS" ^^ parens (group (self#format_select ctx select)))
       | Expr_ascribe (expr, _) -> self#format_expr prec ctx expr
       | Expr_param name -> self#format_param name
       | Expr_match (name, vs) ->
@@ -819,6 +824,11 @@ class virtual ['a, 'ctx] fold =
     method fold_Expr_nav ctx _name expr acc = self#fold_expr ctx expr acc
     method fold_Expr_ascribe ctx expr _ty acc = self#fold_expr ctx expr acc
     method fold_Expr_param _ _ acc = acc
+    method fold_Expr_exists ctx select acc = self#fold_select ctx select acc
+
+    method fold_Expr_in ctx es select acc =
+      let acc = flist self#fold_expr ctx es acc in
+      self#fold_select ctx select acc
 
     method fold_Expr_match ctx _name cases acc =
       flist (fun ctx (_, _, e) acc -> self#fold_expr ctx e acc) ctx cases acc
@@ -830,9 +840,8 @@ class virtual ['a, 'ctx] fold =
       | Expr_app (name, args) -> self#fold_Expr_app ctx name args acc
       | Expr_lit lit -> self#fold_Expr_lit ctx lit acc
       | Expr_name name -> self#fold_Expr_name ctx name acc
-      | Expr_in (es, select) ->
-          let acc = flist self#fold_expr ctx es acc in
-          self#fold_select ctx select acc
+      | Expr_in (es, select) -> self#fold_Expr_in ctx es select acc
+      | Expr_exists select -> self#fold_Expr_exists ctx select acc
       | Expr_nav (name, expr) -> self#fold_Expr_nav ctx name expr acc
       | Expr_ascribe (name, ty) -> self#fold_Expr_ascribe ctx name ty acc
       | Expr_param param -> self#fold_Expr_param ctx param acc

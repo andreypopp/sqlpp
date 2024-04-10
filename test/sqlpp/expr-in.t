@@ -19,3 +19,11 @@
     [%ocaml.error
       "number of expressions (1) doesn't match number of \
        columns (2)"]
+
+  $ p 'select 1 in (select id from users)' -print
+  SELECT
+    1 IN (SELECT users.id AS id FROM users) AS _0
+  
+  let q =
+    (assert false
+      : unit -> (_0:bool -> 'acc -> 'acc, 'acc) Sqlpp_db.query)

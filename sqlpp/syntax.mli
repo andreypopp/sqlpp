@@ -144,6 +144,7 @@ and exprsyn =
   | Expr_name of name
   | Expr_nav of name * expr
   | Expr_in of expr list * select
+  | Expr_exists of select
   | Expr_ascribe of expr * ty_or_expr
   | Expr_param of name
   | Expr_match of name * expr_match_case list
@@ -178,6 +179,7 @@ val expr_app : ?loc:loc -> name -> expr list -> expr
 val expr_lit : ?loc:loc -> lit -> expr
 val expr_name : ?loc:loc -> name -> expr
 val expr_in : ?loc:loc -> expr list -> select -> expr
+val expr_exists : ?loc:loc -> select -> expr
 val expr_ascribe : ?loc:loc -> expr -> ty_or_expr -> expr
 val expr_param : ?loc:loc -> name -> expr
 val expr_nav : ?loc:loc -> name -> expr -> expr
@@ -298,6 +300,8 @@ class virtual ['a, 'ctx] fold : object
   method fold_Expr_nav : 'ctx -> name -> expr -> 'a -> 'a
   method fold_Expr_null : 'ctx -> 'a -> 'a
   method fold_Expr_param : 'ctx -> name -> 'a -> 'a
+  method fold_Expr_in : 'ctx -> expr list -> select -> 'a -> 'a
+  method fold_Expr_exists : 'ctx -> select -> 'a -> 'a
 end
 
 open PPrint

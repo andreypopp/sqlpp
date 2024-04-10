@@ -153,6 +153,10 @@ class virtual ['ctx] printer =
           self#emit ctx " IN (";
           self#emit_select ctx select;
           self#emit ctx ")"
+      | Expr_exists select ->
+          self#emit ctx "EXISTS(";
+          self#emit_select ctx select;
+          self#emit ctx ")"
       | Expr_app (f, args) -> self#emit_Expr_app ctx f args
       | Expr_lit lit -> self#emit_lit ctx lit
       | Expr_ascribe (e, _) -> self#emit_expr ctx e

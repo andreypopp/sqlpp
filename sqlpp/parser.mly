@@ -5,6 +5,8 @@ open Syntax
 let to_loc (loc_start, loc_end) =
   { Location.loc_start; loc_end; loc_ghost = false }
 
+exception Syntax_error of string
+
 %}
 
 %token <Syntax.lit> LIT
@@ -48,6 +50,7 @@ let to_loc (loc_start, loc_end) =
 %token RARROW
 %token END
 %token IN
+%token EXISTS
 %token ELLIPSIS
 %token CREATE
 %token QUERY
@@ -326,6 +329,7 @@ expr_simple:
 | param = param { expr_param ~loc:(fst param) param }
 | LPAREN; expr = expr; RPAREN { expr }
 | e = expr_app { e }
+| EXISTS; LPAREN; select = select; RPAREN { expr_exists ~loc:(to_loc $loc) select }
 | MATCH; param = param; WITH; option(BAR); vs = nonempty_flex_list(BAR, variant); END
   { expr_match ~loc:(to_loc $loc) param vs }
 

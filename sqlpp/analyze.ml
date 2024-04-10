@@ -299,6 +299,16 @@ module Check_agg = struct
         | Some group_by when List.exists group_by ~f:(equal_expr expr) -> ()
         | _ -> super#fold_expr ctx expr ()
 
+      method! fold_Expr_exists ctx select () =
+        (* NOTE: safe to stop check here as the query within should be checked
+           already *)
+        ()
+
+      method! fold_Expr_in ctx es select () =
+        (* NOTE: safe to not check [select] here as the query within should be
+           checked already *)
+        List.fold_left es ~init:() ~f:(fun () x -> self#fold_expr ctx x ())
+
       method! fold_Expr_app ctx name args () =
         let ctx =
           match Option.is_some ctx.group_by, is_agg_expr_app name args with
@@ -435,6 +445,9 @@ let rec infer_expr ~(ctx : Expr_ctx.t) (expr : expr) : ty * expr =
               (List.length es) (List.length row)
       in
       non_null bool, expr_in es select
+  | Expr_exists select ->
+      let _scope, select = infer_select ~ctx:ctx.query_ctx select in
+      non_null bool, expr_exists select
   | Expr_lit (Lit_int _) -> non_null int, expr
   | Expr_lit (Lit_string _) -> non_null string, expr
   | Expr_lit (Lit_bool _) -> non_null bool, expr

@@ -6,6 +6,7 @@ let string_of_token = function
   | IGNORE -> "IGNORE"
   | REPLACE -> "REPLACE"
   | IN -> "IN"
+  | EXISTS -> "EXISTS"
   | AND -> "AND"
   | AS -> "AS"
   | ASC -> "ASC"
@@ -136,6 +137,7 @@ let rec token buf =
   | o, r -> OR
   | n, u, l, l -> NULL
   | i, n -> IN
+  | e, x, i, s, t, s -> EXISTS
   | t, r, u, e -> LIT (Syntax.Lit_bool true)
   | f, a, l, s, e -> LIT (Syntax.Lit_bool false)
   | c, r, e, a, t, e -> CREATE

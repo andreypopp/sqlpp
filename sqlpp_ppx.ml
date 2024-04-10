@@ -48,6 +48,7 @@ let rec eexpr ~loc (expr : expr) =
   | Expr_nav (name, expr) ->
       [%expr Sqlpp.Syntax.expr_nav [%e ename ~loc name] [%e eexpr ~loc expr]]
   | Expr_in (_, _) -> raise (Not_supported "Expr_in")
+  | Expr_exists _ -> raise (Not_supported "Expr_exists")
   | Expr_ascribe (expr, _ty) -> eexpr ~loc expr
   | Expr_param _ -> raise (Not_supported "Expr_param")
   | Expr_match (_, _) -> raise (Not_supported "Expr_match")
